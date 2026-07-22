@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle2, Layers, HelpCircle, FileText, GripVertical, ArrowUp, ArrowDown, Bot, Globe, Link2, Zap, Settings, MessageSquare, Clock, ShieldCheck, Check, Sparkles } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Layers, HelpCircle, FileText, GripVertical, ArrowUp, ArrowDown, Bot, Globe, Link2, Zap, Settings, MessageSquare, Clock, ShieldCheck, Check, Sparkles, Edit3, X } from 'lucide-react';
 import { ServiceTemplatesModal } from './onboarding/ServiceTemplatesModal';
 
 export function ServiceBuilder({ tenantId, apiBaseUrl }) {
   const [activeTab, setActiveTab] = useState('form'); // 'form', 'confirmation', 'rpa', 'workflows'
   const [services, setServices] = useState([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState(null);
 
   // Service Basic Info
   const [title, setTitle] = useState('');
@@ -36,7 +37,6 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
   const [newRuleAction, setNewRuleAction] = useState('send_whatsapp');
   const [newRuleTemplate, setNewRuleTemplate] = useState('Olá {contact_name}, seu atendimento de {service_title} foi atualizado!');
 
-  const [draggedFieldIndex, setDraggedFieldIndex] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -56,8 +56,81 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     if (tenantId) fetchServices();
   }, [tenantId]);
 
-  // Apply 1-Click Setup Template Data across all 4 Tabs
+  // Start Editing an existing Service
+  const handleStartEditService = (service) => {
+    setEditingServiceId(service.id);
+    setTitle(service.title || '');
+    setDescription(service.description || '');
+    setCompletionType(service.completion_type || 'identity');
+    setExternalUrl(service.external_url || '');
+
+    if (service.custom_fields && service.custom_fields.length > 0) {
+      setCustomFields(service.custom_fields.map(f => ({
+        field_label: f.field_label || '',
+        field_type: f.field_type || 'text',
+        options: f.options || '',
+        is_required: !!f.is_required
+      })));
+    } else {
+      setCustomFields([{ field_label: '', field_type: 'text', options: '', is_required: false }]);
+    }
+
+    if (service.automation_mapping?.mappings && service.automation_mapping.mappings.length > 0) {
+      setAutomationMappings(service.automation_mapping.mappings);
+      setSubmitSelector(service.automation_mapping.submit_selector || '');
+    } else {
+      setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
+      setSubmitSelector('');
+    }
+
+    setMessage({ type: 'info', text: `Modo de Edição ativado para o serviço "${service.title}". Faça as alterações e clique em Salvar.` });
+
+    // Scroll to top
+    const elem = document.getElementById('tour-service-builder');
+    if (elem) elem.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Cancel Editing
+  const handleCancelEdit = () => {
+    setEditingServiceId(null);
+    setTitle('');
+    setDescription('');
+    setCompletionType('identity');
+    setExternalUrl('');
+    setSubmitSelector('');
+    setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
+    setWorkflowRules([]);
+    setCustomFields([{ field_label: '', field_type: 'text', options: '', is_required: false }]);
+    setMessage(null);
+  };
+
+  // Delete Service
+  const handleDeleteService = async (serviceId, serviceTitle) => {
+    if (!confirm(`Deseja realmente excluir o serviço "${serviceTitle}"?`)) return;
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/services/${serviceId}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: `Serviço "${serviceTitle}" excluído com sucesso!` });
+        if (editingServiceId === serviceId) {
+          handleCancelEdit();
+        }
+        fetchServices();
+      } else {
+        const err = await res.json();
+        alert(`Erro ao excluir serviço: ${err.error}`);
+      }
+    } catch (err) {
+      alert(`Erro ao excluir: ${err.message}`);
+    }
+  };
+
+  // Apply 1-Click Setup Template Data
   const handleApplyTemplate = (tmplData) => {
+    setEditingServiceId(null);
     setTitle(tmplData.title || '');
     setDescription(tmplData.description || '');
     setCompletionType(tmplData.completion_type || 'identity');
@@ -68,10 +141,10 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setSubmitSelector(tmplData.automation_mapping?.submit_selector || '');
     setWorkflowRules(tmplData.workflow_rules || []);
 
-    setMessage({ type: 'success', text: `Template "${tmplData.title}" carregado! Todas as 4 abas foram preenchidas. Clique em Salvar para finalizar.` });
+    setMessage({ type: 'success', text: `Template "${tmplData.title}" carregado! Todas as abas foram preenchidas. Clique em Salvar.` });
   };
 
-  // Tab 1: Custom Fields Handlers
+  // Custom Fields Handlers
   const addCustomField = () => {
     setCustomFields([
       ...customFields,
@@ -97,7 +170,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setCustomFields(updated);
   };
 
-  // Tab 3: RPA Mapping Handlers
+  // RPA Mapping Handlers
   const addMappingRow = () => {
     setAutomationMappings([
       ...automationMappings,
@@ -115,7 +188,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setAutomationMappings(updated);
   };
 
-  // Tab 4: Workflow Rules Handlers
+  // Workflow Rules Handlers
   const addWorkflowRule = () => {
     if (!newRuleTitle.trim()) return;
 
@@ -159,9 +232,13 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       submit_selector: submitSelector
     };
 
+    const isEdit = !!editingServiceId;
+    const url = isEdit ? `${apiBaseUrl}/api/services/${editingServiceId}` : `${apiBaseUrl}/api/services`;
+    const method = isEdit ? 'PUT' : 'POST';
+
     try {
-      const res = await fetch(`${apiBaseUrl}/api/services`, {
-        method: 'POST',
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
@@ -175,7 +252,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       });
 
       if (res.ok) {
-        const createdService = await res.json();
+        const savedService = await res.json();
 
         // Save Workflow Rules for this service if any
         for (const rule of workflowRules) {
@@ -184,7 +261,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               tenant_id: tenantId,
-              service_id: createdService.id,
+              service_id: savedService.id,
               trigger_event: rule.trigger_type,
               template_body: rule.action_config?.template_body || 'Notificação',
               is_active: true
@@ -192,19 +269,18 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           }).catch(() => {});
         }
 
-        setMessage({ type: 'success', text: 'Plataforma No-Code: Serviço, robô RPA e réguas de workflow salvos com sucesso!' });
-        setTitle('');
-        setDescription('');
-        setCompletionType('identity');
-        setExternalUrl('');
-        setSubmitSelector('');
-        setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
-        setWorkflowRules([]);
-        setCustomFields([{ field_label: '', field_type: 'text', options: '', is_required: false }]);
+        setMessage({
+          type: 'success',
+          text: isEdit
+            ? `Serviço "${title}" atualizado com sucesso!`
+            : 'Serviço No-Code criado e salvo com sucesso!'
+        });
+
+        handleCancelEdit();
         fetchServices();
       } else {
         const errData = await res.json();
-        setMessage({ type: 'error', text: errData.error || 'Erro ao salvar serviço No-Code' });
+        setMessage({ type: 'error', text: errData.error || 'Erro ao salvar serviço' });
       }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
@@ -226,17 +302,30 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div>
           <h2><Zap size={26} className="accent-icon" /> Construtor de Serviços & Automações No-Code</h2>
-          <p>Crie serviços dinâmicos, réguas de comunicação temporal e robôs RPA sem escrever uma única linha de código!</p>
+          <p>Crie e edite serviços dinâmicos, réguas de comunicação e robôs RPA sem escrever código!</p>
         </div>
 
-        <button
-          type="button"
-          className="btn primary"
-          onClick={() => setShowTemplatesModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
-        >
-          <Sparkles size={18} /> Usar Template Pronto (1-Click Setup)
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {editingServiceId && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={handleCancelEdit}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <X size={16} /> Cancelar Edição
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => setShowTemplatesModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
+          >
+            <Sparkles size={18} /> Usar Template Pronto (1-Click Setup)
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -248,55 +337,48 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       {/* 4-Tab Navigation Bar */}
       <div className="nocode-tabs-bar glass-subcard" style={{ display: 'flex', gap: '8px', padding: '6px', marginBottom: '24px', borderRadius: '12px' }}>
         <button
-          id="tour-tab-form"
           type="button"
-          className={`nocode-tab-btn ${activeTab === 'form' ? 'active' : ''}`}
+          className={`nocode-tab ${activeTab === 'form' ? 'active' : ''}`}
           onClick={() => setActiveTab('form')}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s' }}
         >
-          <Layers size={18} /> 1. Geral & Formulário
+          <FileText size={18} /> 1. Formulário & Campos
         </button>
 
         <button
           type="button"
-          className={`nocode-tab-btn ${activeTab === 'confirmation' ? 'active' : ''}`}
+          className={`nocode-tab ${activeTab === 'confirmation' ? 'active' : ''}`}
           onClick={() => setActiveTab('confirmation')}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s' }}
         >
-          <Settings size={18} /> 2. Confirmação & Modais
+          <CheckCircle2 size={18} /> 2. Modal de Conclusão
         </button>
 
         <button
-          id="tour-tab-rpa"
           type="button"
-          className={`nocode-tab-btn ${activeTab === 'rpa' ? 'active' : ''}`}
+          className={`nocode-tab ${activeTab === 'rpa' ? 'active' : ''}`}
           onClick={() => setActiveTab('rpa')}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s' }}
         >
-          <Bot size={18} /> 3. Automação RPA
+          <Bot size={18} /> 3. Robô RPA (Site Externo)
         </button>
 
         <button
-          id="tour-tab-workflows"
           type="button"
-          className={`nocode-tab-btn ${activeTab === 'workflows' ? 'active' : ''}`}
+          className={`nocode-tab ${activeTab === 'workflows' ? 'active' : ''}`}
           onClick={() => setActiveTab('workflows')}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s' }}
         >
-          <Zap size={18} /> 4. Réguas & Workflows
+          <Zap size={18} /> 4. Réguas & WhatsApp
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="service-form">
-        {/* TAB 1: GERAL & FORMULÁRIO */}
-        {activeTab === 'form' && (
-          <div>
+      {/* Form Content */}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group glass-subcard" style={{ padding: '16px', marginBottom: '20px' }}>
+          <div className="form-group-row" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Título do Serviço No-Code</label>
+              <label className="form-label" style={{ fontWeight: '700' }}>Nome do Serviço *</label>
               <input
                 type="text"
                 className="input-control"
-                placeholder="Ex: Emissão de Identidade (RG), Agendamento de Exames, Suporte Técnico"
+                placeholder="Ex: Emissão de Segunda Via, Agendamento"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -304,104 +386,81 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Descrição / Instruções</label>
-              <textarea
-                className="input-control textarea-control"
-                placeholder="Descreva orientações ou pré-requisitos para este atendimento..."
+              <label className="form-label" style={{ fontWeight: '700' }}>Descrição Simples</label>
+              <input
+                type="text"
+                className="input-control"
+                placeholder="Descrição curta que aparece para o atendente..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={2}
               />
             </div>
+          </div>
+        </div>
 
-            <div className="custom-fields-section" style={{ marginTop: '24px' }}>
-              <h3><HelpCircle size={18} /> Campos Dinâmicos do Formulário (Arraste para reordenar)</h3>
+        {/* TAB 1: FORMULÁRIO PERSONALIZADO */}
+        {activeTab === 'form' && (
+          <div className="glass-subcard" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={20} className="accent-icon" /> Perguntas do Formulário (Campos Personalizados)
+            </h3>
 
-              {customFields.map((field, idx) => (
-                <div
-                  key={idx}
-                  className={`field-row glass-row draggable-row ${draggedFieldIndex === idx ? 'is-dragging' : ''}`}
-                  draggable={true}
-                  onDragStart={(e) => { setDraggedFieldIndex(idx); e.dataTransfer.effectAllowed = 'move'; }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (draggedFieldIndex !== null && draggedFieldIndex !== idx) moveField(draggedFieldIndex, idx);
-                    setDraggedFieldIndex(null);
-                  }}
-                  style={{ display: 'grid', gridTemplateColumns: '30px 1.5fr 1fr 1fr 90px 40px', gap: '8px', alignItems: 'center' }}
+            {customFields.map((field, index) => (
+              <div
+                key={index}
+                className="field-row glass-row"
+                style={{ display: 'grid', gridTemplateColumns: '30px 2fr 1.5fr 1fr 40px', gap: '12px', alignItems: 'center', marginBottom: '10px', padding: '10px 14px' }}
+              >
+                <GripVertical size={20} style={{ color: 'var(--text-muted)', cursor: 'grab' }} />
+
+                <input
+                  type="text"
+                  className="input-control"
+                  placeholder="Ex: Qual o seu CPF?, Endereço"
+                  value={field.field_label}
+                  onChange={(e) => handleFieldChange(index, 'field_label', e.target.value)}
+                />
+
+                <select
+                  className="input-control select-control"
+                  value={field.field_type}
+                  onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
                 >
-                  <GripVertical size={18} style={{ color: 'var(--text-muted)', cursor: 'grab' }} />
+                  <option value="text">Texto Curto</option>
+                  <option value="number">Número</option>
+                  <option value="date">Data</option>
+                  <option value="select">Lista de Opções</option>
+                </select>
 
+                <label className="checkbox-label" style={{ fontSize: '0.8rem' }}>
                   <input
-                    type="text"
-                    className="input-control"
-                    placeholder="Rótulo (Ex: Endereço, Data de Nascimento)"
-                    value={field.field_label}
-                    onChange={(e) => handleFieldChange(idx, 'field_label', e.target.value)}
+                    type="checkbox"
+                    checked={field.is_required}
+                    onChange={(e) => handleFieldChange(index, 'is_required', e.target.checked)}
                   />
+                  Obrigatório
+                </label>
 
-                  <select
-                    className="input-control select-control"
-                    value={field.field_type}
-                    onChange={(e) => handleFieldChange(idx, 'field_type', e.target.value)}
-                  >
-                    <option value="text">Texto livre</option>
-                    <option value="number">Número</option>
-                    <option value="date">Data</option>
-                    <option value="datetime">Data e Hora</option>
-                    <option value="select">Seleção / Dropdown</option>
-                    <option value="file">Upload de Arquivo</option>
-                    <option value="boolean">Sim/Não (Checkbox)</option>
-                  </select>
+                <button type="button" className="btn-icon danger" onClick={() => removeCustomField(index)}>
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            ))}
 
-                  {field.field_type === 'select' ? (
-                    <input
-                      type="text"
-                      className="input-control"
-                      placeholder="Opções separadas por vírgula"
-                      value={field.options || ''}
-                      onChange={(e) => handleFieldChange(idx, 'options', e.target.value)}
-                    />
-                  ) : (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Padrão</span>
-                  )}
-
-                  <label className="checkbox-label" style={{ fontSize: '0.8rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={field.is_required}
-                      onChange={(e) => handleFieldChange(idx, 'is_required', e.target.checked)}
-                    />
-                    Obrigatório
-                  </label>
-
-                  {customFields.length > 1 && (
-                    <button type="button" className="btn-icon danger" onClick={() => removeCustomField(idx)}>
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              <button type="button" className="btn secondary" onClick={addCustomField} style={{ marginTop: '12px' }}>
-                <Plus size={16} /> Adicionar Novo Campo
-              </button>
-            </div>
+            <button type="button" className="btn secondary" onClick={addCustomField} style={{ marginTop: '12px' }}>
+              <Plus size={16} /> Adicionar Nova Pergunta
+            </button>
           </div>
         )}
 
-        {/* TAB 2: CONFIRMAÇÃO & MODAIS */}
+        {/* TAB 2: MODAL DE CONCLUSÃO */}
         {activeTab === 'confirmation' && (
           <div className="glass-subcard" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', color: 'var(--primary-accent)', marginBottom: '16px' }}>
-              ⚙️ Regras do Modal de Confirmação e Conclusão
+            <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={20} className="accent-icon" /> Tipo de Modal Exibido ao Concluir Atendimento
             </h3>
 
             <div className="form-group">
-              <label className="form-label" style={{ fontWeight: '700' }}>
-                Tipo de Modal Exibido ao Concluir o Atendimento:
-              </label>
               <select
                 className="input-control select-control"
                 value={completionType}
@@ -414,26 +473,12 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                 <option value="simple">📝 Confirmação Simples com Observações</option>
               </select>
             </div>
-
-            <div className="form-group" style={{ marginTop: '20px' }}>
-              <label className="checkbox-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                <input
-                  type="checkbox"
-                  checked={requireDocumentUpload}
-                  onChange={(e) => setRequireDocumentUpload(e.target.checked)}
-                />
-                Exigir Upload de Documento / Comprovante no momento da conclusão do card
-              </label>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                Se ativado, o operador precisará anexar o comprovante em PDF ou Imagem ao concluir o atendimento.
-              </span>
-            </div>
           </div>
         )}
 
-        {/* TAB 3: AUTOMAÇÃO RPA (PREENCHIMENTO EXTERNO) */}
+        {/* TAB 3: AUTOMAÇÃO RPA */}
         {activeTab === 'rpa' && (
-          <div className="glass-subcard" style={{ padding: '20px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+          <div className="glass-subcard" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-accent)' }}>
               <Bot size={20} /> Automação de Preenchimento em Portal Externo (Robô RPA)
             </h3>
@@ -483,17 +528,6 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               <button type="button" className="btn secondary" onClick={addMappingRow} style={{ marginTop: '8px', fontSize: '0.8rem' }}>
                 <Plus size={14} /> Adicionar Mapeamento "De/Para"
               </button>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label className="form-label"><Link2 size={14} /> Seletor CSS do Botão de Envio (Opcional)</label>
-              <input
-                type="text"
-                className="input-control"
-                placeholder="Ex: button#btn-submit, input[type='submit']"
-                value={submitSelector}
-                onChange={(e) => setSubmitSelector(e.target.value)}
-              />
             </div>
           </div>
         )}
@@ -546,80 +580,63 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                 </div>
               </div>
 
-              {newRuleTrigger === 'on_time_offset' && (
-                <div className="form-group">
-                  <label className="form-label"><Clock size={14} /> Intervalo Temporal (Minutos após o evento)</label>
-                  <input
-                    type="number"
-                    className="input-control"
-                    placeholder="30"
-                    value={newRuleOffsetMinutes}
-                    onChange={(e) => setNewRuleOffsetMinutes(e.target.value)}
-                  />
-                </div>
-              )}
-
-              {newRuleAction === 'send_whatsapp' && (
-                <div className="form-group" style={{ marginTop: '12px' }}>
-                  <label className="form-label">Mensagem do WhatsApp (Template Text)</label>
-                  <textarea
-                    className="input-control textarea-control"
-                    value={newRuleTemplate}
-                    onChange={(e) => setNewRuleTemplate(e.target.value)}
-                    rows={3}
-                  />
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Inserir tags:</span>
-                    {['{contact_name}', '{service_title}', '{status}', '{confirmed_at}'].map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className="var-tag"
-                        onClick={() => setNewRuleTemplate(prev => `${prev} ${tag}`)}
-                        style={{ cursor: 'pointer', border: 'none' }}
-                      >
-                        + {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--primary-accent)', margin: '12px 0' }}>
-                <ShieldCheck size={16} /> Trava Antiduplicidade Ativa: Garante idempotência e previne mensagens duplicadas.
-              </div>
-
               <button type="button" className="btn secondary" onClick={addWorkflowRule}>
                 <Plus size={16} /> Adicionar Régua ao Serviço
               </button>
             </div>
-
-            {/* List of Created Workflow Rules */}
-            {workflowRules.length > 0 && (
-              <div className="rules-list glass-subcard" style={{ padding: '16px' }}>
-                <h4 style={{ fontSize: '0.85rem', marginBottom: '12px' }}>Réguas Configuradas ({workflowRules.length}):</h4>
-                {workflowRules.map((rule) => (
-                  <div key={rule.id} className="glass-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '10px 14px' }}>
-                    <div>
-                      <strong>{rule.title}</strong>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Gatilho: {rule.trigger_type} ➔ Ação: {rule.action_type}
-                      </div>
-                    </div>
-                    <button type="button" className="btn-icon danger" onClick={() => removeWorkflowRule(rule.id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
         <button type="submit" className="btn primary submit-btn" disabled={loading} style={{ marginTop: '28px', width: '100%', padding: '14px', justifyContent: 'center' }}>
-          {loading ? 'Salvando Configurações...' : <><CheckCircle2 size={20} /> Salvar Serviço & Automações No-Code</>}
+          {loading ? 'Salvando Configurações...' : editingServiceId ? <><Edit3 size={20} /> Salvar Alterações no Serviço</> : <><CheckCircle2 size={20} /> Salvar Novo Serviço & Automações No-Code</>}
         </button>
       </form>
+
+      {/* Lista de Serviços Existentes para Edição / Exclusão */}
+      <div className="existing-services-section glass-subcard" style={{ marginTop: '32px', padding: '20px' }}>
+        <h3 style={{ fontSize: '1.05rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Layers size={20} className="accent-icon" /> Meus Serviços Cadastrados ({services.length})
+        </h3>
+
+        {services.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum serviço cadastrado ainda. Use o formulário acima para criar o primeiro!</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {services.map((service) => (
+              <div key={service.id} className="glass-card" style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.5)', border: editingServiceId === service.id ? '2px solid var(--primary-accent)' : '1px solid var(--border-glass)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '0.95rem', margin: 0, fontWeight: '700' }}>{service.title}</h4>
+                  <span className="badge" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{service.completion_type}</span>
+                </div>
+
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', minHeight: '32px' }}>
+                  {service.description || 'Sem descrição cadastrada'}
+                </p>
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-glass)', paddingTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    onClick={() => handleStartEditService(service)}
+                    style={{ fontSize: '0.78rem', padding: '6px 10px', gap: '4px' }}
+                  >
+                    <Edit3 size={14} /> Editar
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn danger"
+                    onClick={() => handleDeleteService(service.id, service.title)}
+                    style={{ fontSize: '0.78rem', padding: '6px 10px', gap: '4px' }}
+                  >
+                    <Trash2 size={14} /> Excluir
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Templates Modal */}
       {showTemplatesModal && (
