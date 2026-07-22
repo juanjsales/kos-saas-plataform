@@ -371,7 +371,7 @@ export async function sendWhatsAppMessage(recipientPhone, content, tenantId = '0
  */
 export function getWhatsAppSessionStatus(tenantId = '00000000-0000-0000-0000-000000000001') {
   const session = getTenantSession(tenantId);
-  const isConnected = !!session.sock?.user;
+  const isConnected = session.status === 'connected' || !!session.sock?.user;
 
   return {
     connected: isConnected,

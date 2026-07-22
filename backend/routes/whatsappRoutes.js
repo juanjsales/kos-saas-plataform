@@ -13,13 +13,14 @@ router.get('/status', async (req, res) => {
   const authFolder = `baileys_auth_info_${tenantId}`;
   const hasSavedSession = fs.existsSync(authFolder);
 
-  // Trigger engine init if disconnected and explicitly requested or saved session exists
-  if (!statusData.connected && statusData.status === 'disconnected' && (shouldInit || hasSavedSession)) {
+  // Trigger engine init if disconnected and explicitly requested OR if saved session exists in DB/disk
+  if (!statusData.connected && (shouldInit || hasSavedSession)) {
     try {
-      // Start or ensure WhatsApp engine is running
-      initWhatsAppEngine(tenantId).catch(err => {
-        console.error(`Error initializing WhatsApp for tenant ${tenantId}:`, err);
-      });
+      if (statusData.status === 'disconnected') {
+        initWhatsAppEngine(tenantId).catch(err => {
+          console.error(`Error initializing WhatsApp for tenant ${tenantId}:`, err);
+        });
+      }
 
       // Wait up to 5 seconds for cloud hosting (Render.com) to receive QR code from WhatsApp servers
       if (shouldInit && !statusData.connected && !statusData.qrCode) {
