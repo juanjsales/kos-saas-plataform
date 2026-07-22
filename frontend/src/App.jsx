@@ -53,10 +53,10 @@ function AppContent() {
   };
 
   const checkWaStatus = async (init = false) => {
-    if (isSuperAdmin || !tenantId) return;
+    const activeTenant = tenantId || profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
     try {
       const initParam = init || showQrModal ? '&init=true' : '';
-      const res = await fetch(`${API_BASE_URL}/api/whatsapp/status?tenant_id=${tenantId}${initParam}`);
+      const res = await fetch(`${API_BASE_URL}/api/whatsapp/status?tenant_id=${activeTenant}${initParam}`);
       if (res.ok) {
         const data = await res.json();
         setWaStatus(data);
