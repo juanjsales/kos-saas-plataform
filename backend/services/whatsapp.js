@@ -5,8 +5,8 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
+import path from 'path';
 import { supabase } from '../config/supabase.js';
-import { useSupabaseAuthState } from './whatsappSupabaseAuth.js';
 
 /**
  * Multi-Tenant Session Registry: Maps tenantId -> { sock, status, lastQrData, qrCodeImage }
@@ -35,6 +35,66 @@ export async function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-00
     }
   } catch (err) {
     console.error('Error clearing auth folder:', err);
+  }
+}
+
+/**
+ * Backs up local auth folder files to Supabase DB asynchronously
+ */
+async function syncAuthFolderToSupabase(tenantId) {
+  const authFolder = `baileys_auth_info_${tenantId}`;
+  if (!fs.existsSync(authFolder)) return;
+
+  try {
+    const files = fs.readdirSync(authFolder);
+    for (const fileName of files) {
+      const filePath = path.join(authFolder, fileName);
+      if (fs.lstatSync(filePath).isFile()) {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        await supabase
+          .from('whatsapp_sessions')
+          .upsert({
+            tenant_id: tenantId,
+            data_key: fileName,
+            data_val: fileContent,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'tenant_id,data_key' })
+          .catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error(`Error backing up auth folder for tenant ${tenantId} to Supabase:`, err.message);
+  }
+}
+
+/**
+ * Restores auth folder files from Supabase DB to local disk if missing
+ */
+async function restoreAuthFolderFromSupabase(tenantId) {
+  const authFolder = `baileys_auth_info_${tenantId}`;
+  try {
+    const { data: dbFiles, error } = await supabase
+      .from('whatsapp_sessions')
+      .select('data_key, data_val')
+      .eq('tenant_id', tenantId);
+
+    if (error || !dbFiles || dbFiles.length === 0) return false;
+
+    if (!fs.existsSync(authFolder)) {
+      fs.mkdirSync(authFolder, { recursive: true });
+    }
+
+    for (const item of dbFiles) {
+      if (item.data_key && item.data_val) {
+        const filePath = path.join(authFolder, item.data_key);
+        fs.writeFileSync(filePath, item.data_val, 'utf8');
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`Error restoring auth folder for tenant ${tenantId} from Supabase:`, err.message);
+    return false;
   }
 }
 
@@ -102,8 +162,7 @@ export async function autoRestoreActiveWhatsAppSessions() {
     // 1. Fetch saved session tenant IDs from Supabase DB
     const { data: dbSessions } = await supabase
       .from('whatsapp_sessions')
-      .select('tenant_id')
-      .eq('data_key', 'creds');
+      .select('tenant_id');
 
     if (dbSessions && dbSessions.length > 0) {
       dbSessions.forEach(s => tenantIdsToRestore.add(s.tenant_id));
@@ -119,7 +178,7 @@ export async function autoRestoreActiveWhatsAppSessions() {
       });
     }
 
-    console.log(`🤖 [WhatsApp Multi-Session] Restoring ${tenantIdsToRestore.size} WhatsApp sessions from Supabase Cloud DB...`);
+    console.log(`🤖 [WhatsApp Multi-Session] Restoring ${tenantIdsToRestore.size} WhatsApp sessions...`);
 
     for (const tenantId of tenantIdsToRestore) {
       initWhatsAppEngine(tenantId).catch(err => {
@@ -132,7 +191,7 @@ export async function autoRestoreActiveWhatsAppSessions() {
 }
 
 /**
- * Initializes an isolated Baileys WhatsApp Engine session per tenant with persistent Supabase DB auth
+ * Initializes an isolated Baileys WhatsApp Engine session per tenant with fast zero-latency auth & Supabase backup
  */
 export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
   const session = getTenantSession(tenantId);
@@ -143,20 +202,15 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
   }
 
   const activeTenantId = await getOrEnsureValidTenant(tenantId);
+  const authFolder = `baileys_auth_info_${activeTenantId}`;
 
-  // Persistent Auth State in Supabase Database (survives Render redeploys)
-  let state, saveCreds;
-  try {
-    const supabaseAuth = await useSupabaseAuthState(activeTenantId);
-    state = supabaseAuth.state;
-    saveCreds = supabaseAuth.saveCreds;
-  } catch (err) {
-    console.warn(`Falling back to local disk auth for tenant ${activeTenantId}:`, err.message);
-    const authFolder = `baileys_auth_info_${activeTenantId}`;
-    const multiFile = await useMultiFileAuthState(authFolder);
-    state = multiFile.state;
-    saveCreds = multiFile.saveCreds;
+  // Restore folder from Supabase DB if missing from local disk
+  if (!fs.existsSync(authFolder)) {
+    await restoreAuthFolderFromSupabase(activeTenantId);
   }
+
+  // Zero-latency local disk auth state for instant pairing
+  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
 
   // Robust version fetch with 3s timeout & fallback
   let version;
@@ -180,7 +234,11 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
   session.sock = sock;
   session.status = 'connecting';
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', async () => {
+    await saveCreds();
+    // Sync updated creds to Supabase Cloud DB in background
+    syncAuthFolderToSupabase(activeTenantId);
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -222,6 +280,8 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
       session.lastQrData = null;
       session.qrCodeImage = null;
       console.log(`✅ [WhatsApp Multi-Session] Engine connected for Tenant ${activeTenantId} (${sock.user?.name || sock.user?.id})!`);
+      // Sync complete active session keys to Supabase DB
+      syncAuthFolderToSupabase(activeTenantId);
     }
   });
 
