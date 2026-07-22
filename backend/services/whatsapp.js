@@ -228,7 +228,13 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
     version,
     auth: state,
     logger: pino({ level: 'silent' }),
-    browser: ['KOS SaaS', 'Chrome', '1.0.0']
+    browser: ['KOS SaaS', 'Chrome', '1.0.0'],
+    printQRInTerminal: false,
+    syncFullHistory: false,
+    keepAliveIntervalMs: 25000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: undefined,
+    retryRequestDelayMs: 2000
   });
 
   session.sock = sock;
@@ -260,20 +266,22 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
-      console.log(`[WhatsApp Multi-Session] Tenant ${activeTenantId} connection closed (Status: ${statusCode}). Auto-renewing QR code: ${!isLoggedOut}`);
+      const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
+
+      console.log(`[WhatsApp Multi-Session] Tenant ${activeTenantId} connection closed (Status: ${statusCode}, RestartRequired: ${isRestartRequired}).`);
 
       session.sock = null;
       session.qrCodeImage = null;
-      session.lastQrData = null;
-      session.status = 'disconnected';
 
       if (isLoggedOut) {
+        session.status = 'disconnected';
         await clearAuthInfoFolder(activeTenantId);
       } else {
-        // Automatically reconnect after 1s to fetch a fresh QR code or restore session
+        session.status = 'connecting';
+        // Instantly reconnect using saved auth credentials
         setTimeout(() => {
           initWhatsAppEngine(activeTenantId).catch(() => {});
-        }, 1000);
+        }, isRestartRequired ? 500 : 2000);
       }
     } else if (connection === 'open') {
       session.status = 'connected';
