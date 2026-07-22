@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables
+.env
+**/.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+**/dist/
+build/
+
+# WhatsApp Auth Session Folders
+baileys_auth_info*
+**/baileys_auth_info*
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
