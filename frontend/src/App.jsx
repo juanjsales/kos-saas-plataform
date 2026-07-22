@@ -93,6 +93,7 @@ function AppContent() {
   const handleNavigateFromChecklist = (target) => {
     if (target === 'whatsapp') {
       setShowQrModal(true);
+      checkWaStatus(true);
     } else if (target === 'services') {
       setActiveTab('services');
     } else if (target === 'kanban') {

@@ -14,24 +14,26 @@ router.get('/status', async (req, res) => {
   const hasSavedSession = fs.existsSync(authFolder);
 
   // Trigger engine init if requested or saved session exists
-  if (!statusData.connected && (statusData.status === 'disconnected' || !statusData.sock) && (shouldInit || hasSavedSession)) {
+  if (!statusData.connected && (shouldInit || hasSavedSession)) {
     try {
-      await initWhatsAppEngine(tenantId);
+      // Start or ensure WhatsApp engine is running
+      initWhatsAppEngine(tenantId).catch(err => {
+        console.error(`Error initializing WhatsApp for tenant ${tenantId}:`, err);
+      });
 
-      // Give Baileys up to 2.5 seconds to fetch QR code image from WhatsApp servers
+      // Wait up to 5 seconds for cloud hosting (Render.com) to receive QR code from WhatsApp servers
       if (shouldInit && !statusData.connected && !statusData.qrCode) {
-        for (let i = 0; i < 10; i++) {
-          await new Promise(resolve => setTimeout(resolve, 250));
+        for (let i = 0; i < 25; i++) {
+          await new Promise(resolve => setTimeout(resolve, 200));
           statusData = getWhatsAppSessionStatus(tenantId);
           if (statusData.qrCode || statusData.connected) break;
         }
       }
     } catch (err) {
-      console.error(`Error initializing WhatsApp for tenant ${tenantId}:`, err);
+      console.error(`Error in status route for tenant ${tenantId}:`, err);
     }
   }
 
-  // Refresh status data before returning
   statusData = getWhatsAppSessionStatus(tenantId);
   return res.json(statusData);
 });
