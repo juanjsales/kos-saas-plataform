@@ -88,7 +88,7 @@ function AppContent() {
     let interval;
     if (showQrModal && !waStatus.connected) {
       checkWaStatus(true);
-      interval = setInterval(() => checkWaStatus(true), 3000);
+      interval = setInterval(() => checkWaStatus(false), 3000);
     } else {
       checkWaStatus();
       interval = setInterval(() => checkWaStatus(), 5000);

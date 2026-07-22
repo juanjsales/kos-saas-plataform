@@ -13,8 +13,8 @@ router.get('/status', async (req, res) => {
   const authFolder = `baileys_auth_info_${tenantId}`;
   const hasSavedSession = fs.existsSync(authFolder);
 
-  // Trigger engine init if requested or saved session exists
-  if (!statusData.connected && (shouldInit || hasSavedSession)) {
+  // Trigger engine init if disconnected and explicitly requested or saved session exists
+  if (!statusData.connected && statusData.status === 'disconnected' && (shouldInit || hasSavedSession)) {
     try {
       // Start or ensure WhatsApp engine is running
       initWhatsAppEngine(tenantId).catch(err => {
