@@ -84,17 +84,17 @@ function AppContent() {
   };
 
   useEffect(() => {
-    if (showQrModal) {
-      checkWaStatus(true);
-    }
-  }, [showQrModal]);
-
-  useEffect(() => {
-    checkWaStatus();
     fetchStats();
-    const interval = setInterval(checkWaStatus, 5000);
+    let interval;
+    if (showQrModal && !waStatus.connected) {
+      checkWaStatus(true);
+      interval = setInterval(() => checkWaStatus(true), 3000);
+    } else {
+      checkWaStatus();
+      interval = setInterval(() => checkWaStatus(), 5000);
+    }
     return () => clearInterval(interval);
-  }, [tenantId]);
+  }, [showQrModal, waStatus.connected, tenantId]);
 
   const handleNavigateFromChecklist = (target) => {
     if (target === 'whatsapp') {
