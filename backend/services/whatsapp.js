@@ -6,6 +6,7 @@ import makeWASocket, {
 import pino from 'pino';
 import fs from 'fs';
 import { supabase } from '../config/supabase.js';
+import { useSupabaseAuthState } from './whatsappSupabaseAuth.js';
 
 /**
  * Multi-Tenant Session Registry: Maps tenantId -> { sock, status, lastQrData, qrCodeImage }
@@ -21,13 +22,15 @@ export function formatToJid(phone) {
 }
 
 /**
- * Clears session credentials folder for a specific tenant
+ * Clears session credentials from Supabase DB and disk for a specific tenant
  */
-export function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-000000000001') {
+export async function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-000000000001') {
   try {
+    console.log(`[WhatsApp Multi-Session] Clearing auth session for tenant ${tenantId}...`);
+    await supabase.from('whatsapp_sessions').delete().eq('tenant_id', tenantId).catch(() => {});
+
     const authFolder = `baileys_auth_info_${tenantId}`;
     if (fs.existsSync(authFolder)) {
-      console.log(`[WhatsApp Multi-Session] Clearing auth folder for tenant ${tenantId}...`);
       fs.rmSync(authFolder, { recursive: true, force: true });
     }
   } catch (err) {
@@ -90,22 +93,38 @@ export function getTenantSession(tenantId = '00000000-0000-0000-0000-00000000000
 }
 
 /**
- * Automatically restores all previously authenticated WhatsApp sessions from disk
+ * Automatically restores all active WhatsApp sessions from Supabase DB or disk on server startup
  */
 export async function autoRestoreActiveWhatsAppSessions() {
   try {
-    const files = fs.readdirSync('.');
-    const sessionFolders = files.filter(f => f.startsWith('baileys_auth_info_'));
+    const tenantIdsToRestore = new Set();
 
-    console.log(`🤖 [WhatsApp Multi-Session] Found ${sessionFolders.length} saved tenant sessions on disk. Restoring...`);
+    // 1. Fetch saved session tenant IDs from Supabase DB
+    const { data: dbSessions } = await supabase
+      .from('whatsapp_sessions')
+      .select('tenant_id')
+      .eq('data_key', 'creds');
 
-    for (const folder of sessionFolders) {
-      const tenantId = folder.replace('baileys_auth_info_', '');
-      if (tenantId) {
-        initWhatsAppEngine(tenantId).catch(err => {
-          console.error(`Error restoring WhatsApp session for tenant ${tenantId}:`, err);
-        });
-      }
+    if (dbSessions && dbSessions.length > 0) {
+      dbSessions.forEach(s => tenantIdsToRestore.add(s.tenant_id));
+    }
+
+    // 2. Check local disk fallback
+    if (fs.existsSync('.')) {
+      const files = fs.readdirSync('.');
+      const sessionFolders = files.filter(f => f.startsWith('baileys_auth_info_'));
+      sessionFolders.forEach(folder => {
+        const tid = folder.replace('baileys_auth_info_', '');
+        if (tid) tenantIdsToRestore.add(tid);
+      });
+    }
+
+    console.log(`🤖 [WhatsApp Multi-Session] Restoring ${tenantIdsToRestore.size} WhatsApp sessions from Supabase Cloud DB...`);
+
+    for (const tenantId of tenantIdsToRestore) {
+      initWhatsAppEngine(tenantId).catch(err => {
+        console.error(`Error restoring WhatsApp session for tenant ${tenantId}:`, err);
+      });
     }
   } catch (err) {
     console.error('Error auto restoring WhatsApp sessions:', err);
@@ -113,7 +132,7 @@ export async function autoRestoreActiveWhatsAppSessions() {
 }
 
 /**
- * Initializes an isolated Baileys WhatsApp Engine session per tenant
+ * Initializes an isolated Baileys WhatsApp Engine session per tenant with persistent Supabase DB auth
  */
 export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
   const session = getTenantSession(tenantId);
@@ -124,9 +143,20 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
   }
 
   const activeTenantId = await getOrEnsureValidTenant(tenantId);
-  const authFolder = `baileys_auth_info_${activeTenantId}`;
 
-  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+  // Persistent Auth State in Supabase Database (survives Render redeploys)
+  let state, saveCreds;
+  try {
+    const supabaseAuth = await useSupabaseAuthState(activeTenantId);
+    state = supabaseAuth.state;
+    saveCreds = supabaseAuth.saveCreds;
+  } catch (err) {
+    console.warn(`Falling back to local disk auth for tenant ${activeTenantId}:`, err.message);
+    const authFolder = `baileys_auth_info_${activeTenantId}`;
+    const multiFile = await useMultiFileAuthState(authFolder);
+    state = multiFile.state;
+    saveCreds = multiFile.saveCreds;
+  }
 
   // Robust version fetch with 3s timeout & fallback
   let version;
@@ -180,9 +210,9 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
       session.status = 'disconnected';
 
       if (isLoggedOut) {
-        clearAuthInfoFolder(activeTenantId);
+        await clearAuthInfoFolder(activeTenantId);
       } else {
-        // Automatically reconnect after 1s to fetch a fresh QR code
+        // Automatically reconnect after 1s to fetch a fresh QR code or restore session
         setTimeout(() => {
           initWhatsAppEngine(activeTenantId).catch(() => {});
         }, 1000);
@@ -216,11 +246,9 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
       const contactName = msg.pushName || senderPhone;
 
       try {
-        // 0. Check for LGPD Consent Opt-Out keywords
         const { processWhatsAppConsentKeywords } = await import('./whatsappOptOutService.js');
         await processWhatsAppConsentKeywords(activeTenantId, senderPhone, content);
 
-        // 1. Upsert Chat entry
         await supabase
           .from('chats')
           .upsert({
@@ -230,7 +258,6 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
             updated_at: new Date().toISOString()
           }, { onConflict: 'id' });
 
-        // 2. Upsert Contact entry
         await supabase
           .from('contacts')
           .upsert({
@@ -239,7 +266,6 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
             phone: senderPhone
           }, { onConflict: 'tenant_id,phone' });
 
-        // 3. Insert Message entry
         await supabase
           .from('messages')
           .insert({
@@ -303,7 +329,7 @@ export async function logoutWhatsAppEngine(tenantId = '00000000-0000-0000-0000-0
     session.lastQrData = null;
     session.qrCodeImage = null;
 
-    clearAuthInfoFolder(tenantId);
+    await clearAuthInfoFolder(tenantId);
     return { success: true };
   } catch (err) {
     console.error(`Error logging out WhatsApp for tenant ${tenantId}:`, err);
