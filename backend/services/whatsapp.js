@@ -119,8 +119,8 @@ export async function autoRestoreActiveWhatsAppSessions() {
 export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
   const session = getTenantSession(tenantId);
 
-  // If already connected, return existing socket
-  if (session.sock?.user) {
+  // If already connected or currently connecting/qr_ready, return existing socket
+  if (session.sock && (session.sock.user || session.status === 'connecting' || session.status === 'qr_ready')) {
     return session.sock;
   }
 
