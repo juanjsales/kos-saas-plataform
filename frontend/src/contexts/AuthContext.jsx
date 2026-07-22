@@ -43,7 +43,11 @@ export function AuthProvider({ children, apiBaseUrl }) {
           password
         });
 
-        if (!authErr && authRes?.user) {
+        if (authErr) {
+          throw new Error('E-mail ou senha incorretos. Verifique suas credenciais.');
+        }
+
+        if (authRes?.user) {
           userData = authRes.user;
 
           // Fetch matching profile from public.users table
@@ -59,30 +63,17 @@ export function AuthProvider({ children, apiBaseUrl }) {
             profileData = {
               id: userData.id,
               full_name: userData.user_metadata?.full_name || email,
-              role: userData.user_metadata?.role || (email.includes('admin') || email.includes('super') ? 'super_admin' : 'tenant_admin'),
-              tenant_id: userData.user_metadata?.tenant_id || '00000000-0000-0000-0000-000000000001'
+              role: userData.user_metadata?.role || 'tenant_admin',
+              tenant_id: userData.user_metadata?.tenant_id || null
             };
           }
         }
       } catch (e) {
-        console.warn('Supabase Auth Signin notice:', e.message);
+        throw new Error(e.message || 'Erro ao realizar login. Tente novamente.');
       }
 
-      // 2. Fallback for Dev/Demo Accounts if not authenticated via Supabase Auth
       if (!userData) {
-        if (email.includes('admin@') || email.includes('super')) {
-          userData = { id: '00000000-0000-0000-0000-000000000001', email };
-          profileData = { id: userData.id, full_name: 'Dono Principal (KOS Master)', role: 'super_admin', tenant_id: '00000000-0000-0000-0000-000000000001' };
-        } else if (email.includes('oficina') || email.includes('empresaB')) {
-          userData = { id: '00000000-0000-0000-0000-000000000002', email };
-          profileData = { id: userData.id, full_name: 'João (Oficina do João)', role: 'tenant_admin', tenant_id: '00000000-0000-0000-0000-000000000002' };
-        } else if (email.includes('dono') || email.includes('clinica')) {
-          userData = { id: '00000000-0000-0000-0000-000000000003', email };
-          profileData = { id: userData.id, full_name: 'Carlos (Clínica Saúde)', role: 'tenant_admin', tenant_id: '00000000-0000-0000-0000-000000000001' };
-        } else {
-          userData = { id: '00000000-0000-0000-0000-000000000004', email };
-          profileData = { id: userData.id, full_name: 'Atendente', role: 'tenant_operator', tenant_id: '00000000-0000-0000-0000-000000000001' };
-        }
+        throw new Error('Não foi possível autenticar o usuário. Verifique suas credenciais.');
       }
 
       // 3. Fetch Tenant Details to check suspension status

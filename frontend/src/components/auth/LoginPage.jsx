@@ -130,42 +130,6 @@ export function LoginPage({ apiBaseUrl }) {
             {submitting ? 'Aguarde um momentinho...' : <><ArrowRight size={18} /> Entrar na Minha Conta</>}
           </button>
         </form>
-
-        {/* 1-Click Demo Login Shortcuts */}
-        <div style={{ marginTop: '32px', paddingTop: '20px', borderTop: '1px solid var(--border-glass)' }}>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '12px', fontWeight: '600' }}>
-            ⚡ ENTRAR DIRETO (BOTÕES DE TESTE):
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => handleDemoLogin('admin@saas.com', '123456')}
-              style={{ fontSize: '0.72rem', padding: '8px 4px', justifyContent: 'center', flexDirection: 'column', gap: '2px' }}
-            >
-              <Shield size={14} style={{ color: '#f59e0b' }} /> Dono Geral
-            </button>
-
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => handleDemoLogin('dono@clinica.com', '123456')}
-              style={{ fontSize: '0.72rem', padding: '8px 4px', justifyContent: 'center', flexDirection: 'column', gap: '2px' }}
-            >
-              <Shield size={14} style={{ color: 'var(--primary-accent)' }} /> Empresa A
-            </button>
-
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => handleDemoLogin('dono@oficina.com', '123456')}
-              style={{ fontSize: '0.72rem', padding: '8px 4px', justifyContent: 'center', flexDirection: 'column', gap: '2px' }}
-            >
-              <Shield size={14} style={{ color: '#10b981' }} /> Empresa B
-            </button>
-          </div>
-        </div>
       </div>
 
       {showForgotModal && (
