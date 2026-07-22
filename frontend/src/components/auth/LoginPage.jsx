@@ -87,9 +87,12 @@ export function LoginPage({ apiBaseUrl }) {
         {/* Form */}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '0.85rem' }}>Seu E-mail</label>
+            <label htmlFor="login-email" className="form-label" style={{ fontSize: '0.85rem' }}>Seu E-mail</label>
             <input
+              id="login-email"
+              name="email"
               type="email"
+              autoComplete="username"
               className="input-control"
               placeholder="seu.email@empresa.com"
               value={email}
@@ -101,7 +104,7 @@ export function LoginPage({ apiBaseUrl }) {
 
           <div className="form-group" style={{ marginTop: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label className="form-label" style={{ fontSize: '0.85rem', margin: 0 }}>Sua Senha</label>
+              <label htmlFor="login-password" className="form-label" style={{ fontSize: '0.85rem', margin: 0 }}>Sua Senha</label>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(true)}
@@ -111,7 +114,10 @@ export function LoginPage({ apiBaseUrl }) {
               </button>
             </div>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               className="input-control"
               placeholder="••••••••"
               value={password}
