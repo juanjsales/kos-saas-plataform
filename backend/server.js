@@ -24,6 +24,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Enable trust proxy for cloud deployment (Render/Railway/Vercel)
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
 

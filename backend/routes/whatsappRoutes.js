@@ -10,16 +10,29 @@ router.get('/status', async (req, res) => {
 
   let statusData = getWhatsAppSessionStatus(tenantId);
 
-  // Trigger engine init if explicitly requested (e.g. user clicked "Conectar WhatsApp") or if saved session exists
   const authFolder = `baileys_auth_info_${tenantId}`;
   const hasSavedSession = fs.existsSync(authFolder);
 
-  if (!statusData.connected && statusData.status === 'disconnected' && (shouldInit || hasSavedSession)) {
-    initWhatsAppEngine(tenantId).catch(err => {
+  // Trigger engine init if requested or saved session exists
+  if (!statusData.connected && (statusData.status === 'disconnected' || !statusData.sock) && (shouldInit || hasSavedSession)) {
+    try {
+      await initWhatsAppEngine(tenantId);
+
+      // Give Baileys up to 2.5 seconds to fetch QR code image from WhatsApp servers
+      if (shouldInit && !statusData.connected && !statusData.qrCode) {
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          statusData = getWhatsAppSessionStatus(tenantId);
+          if (statusData.qrCode || statusData.connected) break;
+        }
+      }
+    } catch (err) {
       console.error(`Error initializing WhatsApp for tenant ${tenantId}:`, err);
-    });
+    }
   }
 
+  // Refresh status data before returning
+  statusData = getWhatsAppSessionStatus(tenantId);
   return res.json(statusData);
 });
 
