@@ -84,6 +84,12 @@ function AppContent() {
   };
 
   useEffect(() => {
+    if (showQrModal) {
+      checkWaStatus(true);
+    }
+  }, [showQrModal]);
+
+  useEffect(() => {
     checkWaStatus();
     fetchStats();
     const interval = setInterval(checkWaStatus, 5000);
@@ -177,7 +183,10 @@ function AppContent() {
           {!isSuperAdmin && (
             <button
               className={`btn-status ${waStatus.connected ? 'status-connected' : 'status-disconnected'}`}
-              onClick={() => setShowQrModal(true)}
+              onClick={() => {
+                setShowQrModal(true);
+                checkWaStatus(true);
+              }}
             >
               {waStatus.connected ? <CheckCircle2 size={16} /> : <QrCode size={16} />}
               <span>{waStatus.connected ? 'WhatsApp Funcionando' : 'Conectar WhatsApp'}</span>
