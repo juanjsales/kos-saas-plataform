@@ -3,7 +3,6 @@ import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion
 } from '@whiskeysockets/baileys';
-import qrcodeTerminal from 'qrcode-terminal';
 import pino from 'pino';
 import fs from 'fs';
 import { supabase } from '../config/supabase.js';
@@ -119,8 +118,8 @@ export async function autoRestoreActiveWhatsAppSessions() {
 export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
   const session = getTenantSession(tenantId);
 
-  // If already connected or currently connecting/qr_ready, return existing socket
-  if (session.sock && (session.sock.user || session.status === 'connecting' || session.status === 'qr_ready')) {
+  // If already connected or has QR code ready, reuse socket
+  if (session.sock && (session.sock.user || session.qrCodeImage)) {
     return session.sock;
   }
 
@@ -128,12 +127,24 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
   const authFolder = `baileys_auth_info_${activeTenantId}`;
 
   const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-  const { version } = await fetchLatestBaileysVersion();
+
+  // Robust version fetch with 3s timeout & fallback
+  let version;
+  try {
+    const vData = await Promise.race([
+      fetchLatestBaileysVersion(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Version fetch timeout')), 3000))
+    ]);
+    version = vData.version;
+  } catch (e) {
+    version = [2, 3000, 1015901307];
+  }
 
   const sock = makeWASocket({
     version,
     auth: state,
-    logger: pino({ level: 'silent' })
+    logger: pino({ level: 'silent' }),
+    browser: ['KOS SaaS', 'Chrome', '1.0.0']
   });
 
   session.sock = sock;
@@ -151,15 +162,14 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
       try {
         const qrcodeModule = await import('qrcode');
         session.qrCodeImage = await qrcodeModule.default.toDataURL(qr);
+        console.log(`✅ [WhatsApp Multi-Session] Generated QR Code DataURL for Tenant ${activeTenantId}`);
       } catch (err) {
+        console.error('Error generating QR DataURL:', err);
         session.qrCodeImage = null;
       }
     }
 
     if (connection === 'close') {
-      session.status = 'disconnected';
-      session.qrCodeImage = null;
-
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
       console.log(`[WhatsApp Multi-Session] Tenant ${activeTenantId} connection closed (Status: ${statusCode}). Reconnecting: ${!isLoggedOut}`);
@@ -167,12 +177,11 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
       if (isLoggedOut) {
         clearAuthInfoFolder(activeTenantId);
         session.sock = null;
-      }
-
-      if (!isLoggedOut) {
-        setTimeout(() => {
-          initWhatsAppEngine(activeTenantId);
-        }, 3000);
+        session.status = 'disconnected';
+        session.qrCodeImage = null;
+      } else {
+        // Automatically reconnect unless logged out
+        session.status = 'connecting';
       }
     } else if (connection === 'open') {
       session.status = 'connected';

@@ -32,7 +32,7 @@ function AppContent() {
   const [cardsCount, setCardsCount] = useState(0);
 
   const { tenantName, tenantLogo } = useTheme();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
 
   useEffect(() => {
     if (isSuperAdmin) {
