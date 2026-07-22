@@ -10,13 +10,13 @@
   "icons": [
     {
       "src": "/pwa-192x192.png",
-      "sizes": "192x192",
+      "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
       "src": "/pwa-512x512.png",
-      "sizes": "512x512",
+      "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"
     }
