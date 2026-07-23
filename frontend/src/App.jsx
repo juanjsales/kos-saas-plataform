@@ -31,6 +31,7 @@ function AppContent() {
   const [serviceCount, setServiceCount] = useState(0);
   const [cardsCount, setCardsCount] = useState(0);
 
+  const { tenantName, tenantLogo } = useTheme();
   const getSanitizedApiUrl = () => {
     const rawUrl = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
     if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1'))) {
