@@ -29,8 +29,17 @@ export function AuthProvider({ children, apiBaseUrl }) {
     initSession();
   }, []);
 
+  const getSafeApiUrl = () => {
+    const rawUrl = apiBaseUrl || import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1'))) {
+      return 'https://kos-backend-tuqi.onrender.com';
+    }
+    return rawUrl;
+  };
+
   const login = async (email, password) => {
     setLoading(true);
+    const safeApiUrl = getSafeApiUrl();
     try {
       let userData = null;
       let profileData = null;
@@ -78,7 +87,7 @@ export function AuthProvider({ children, apiBaseUrl }) {
 
       // 3. Fetch Tenant Details to check suspension status (safe non-blocking check)
       try {
-        const tRes = await fetch(`${apiBaseUrl}/api/admin/tenants`);
+        const tRes = await fetch(`${safeApiUrl}/api/admin/tenants`);
         if (tRes.ok) {
           const tenants = await tRes.json();
           if (tenants && tenants.length > 0) {

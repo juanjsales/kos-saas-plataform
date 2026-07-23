@@ -31,8 +31,14 @@ function AppContent() {
   const [serviceCount, setServiceCount] = useState(0);
   const [cardsCount, setCardsCount] = useState(0);
 
-  const { tenantName, tenantLogo } = useTheme();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+  const getSanitizedApiUrl = () => {
+    const rawUrl = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1'))) {
+      return 'https://kos-backend-tuqi.onrender.com';
+    }
+    return rawUrl;
+  };
+  const API_BASE_URL = getSanitizedApiUrl();
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -397,7 +403,10 @@ function AppContent() {
 }
 
 export default function App() {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+  const rawUrl = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+  const API_BASE_URL = (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')))
+    ? 'https://kos-backend-tuqi.onrender.com'
+    : rawUrl;
 
   return (
     <AuthProvider apiBaseUrl={API_BASE_URL}>

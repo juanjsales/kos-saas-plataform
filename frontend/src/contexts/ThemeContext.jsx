@@ -18,20 +18,27 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
   const [accentColor, setAccentColor] = useState('#6366f1');
   const [kanbanDensity, setKanbanDensity] = useState('comfortable');
 
+  const rawUrl = apiBaseUrl || import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+  const safeApiUrl = (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')))
+    ? 'https://kos-backend-tuqi.onrender.com'
+    : rawUrl;
+
   // Fetch Tenant Company Branding in Real Time
   useEffect(() => {
     async function fetchTenantBrand() {
       if (!activeTenantId) return;
       try {
-        const res = await fetch(`${apiBaseUrl}/api/admin/tenants`);
+        const res = await fetch(`${safeApiUrl}/api/admin/tenants`);
         if (res.ok) {
           const tenants = await res.json();
-          const current = tenants.find(t => t.id === activeTenantId);
-          if (current) {
-            setTenantName(current.name || 'KOS System');
-            setTenantLogo(current.logo_url || null);
-            if (current.brand_colors?.primary) {
-              setTenantBrandColor(current.brand_colors.primary);
+          if (Array.isArray(tenants)) {
+            const current = tenants.find(t => t.id === activeTenantId);
+            if (current) {
+              setTenantName(current.name || 'KOS System');
+              setTenantLogo(current.logo_url || null);
+              if (current.brand_colors?.primary) {
+                setTenantBrandColor(current.brand_colors.primary);
+              }
             }
           }
         }
@@ -40,7 +47,7 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
       }
     }
     fetchTenantBrand();
-  }, [activeTenantId, apiBaseUrl]);
+  }, [activeTenantId, safeApiUrl]);
 
   // Sync document title with dynamic company name
   useEffect(() => {
@@ -53,7 +60,7 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
   useEffect(() => {
     async function fetchUserPrefs() {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/user/preferences?user_id=${userId || '00000000-0000-0000-0000-000000000001'}`);
+        const res = await fetch(`${safeApiUrl}/api/user/preferences?user_id=${userId || '00000000-0000-0000-0000-000000000001'}`);
         if (res.ok) {
           const prefs = await res.json();
           if (prefs.theme_mode) setThemeMode(prefs.theme_mode);
@@ -65,7 +72,7 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
       }
     }
     fetchUserPrefs();
-  }, [userId, apiBaseUrl]);
+  }, [userId, safeApiUrl]);
 
   // Apply CSS Custom Variables dynamically on HTML document root
   useEffect(() => {
