@@ -63,20 +63,6 @@ export async function triggerCardNotification(cardId, triggerEvent) {
       return { success: false, reason: 'Card not found' };
     }
 
-    // 2. Query active notification rules for this tenant, service, and trigger_event
-    const { data: rules, error: rulesError } = await supabase
-      .from('notification_rules')
-      .select('*')
-      .eq('tenant_id', card.tenant_id)
-      .eq('service_id', card.service_id)
-      .eq('trigger_event', triggerEvent)
-      .eq('is_active', true);
-
-    if (rulesError || !rules || rules.length === 0) {
-      console.log(`No active notification rule for service ${card.service_id} on trigger '${triggerEvent}'`);
-      return { success: true, dispatched: 0 };
-    }
-
     const contactName = card.contacts?.name || 'Cliente';
     const contactPhone = card.contacts?.phone;
     const serviceTitle = card.services?.title || 'Serviço';
@@ -86,27 +72,63 @@ export async function triggerCardNotification(cardId, triggerEvent) {
       return { success: false, reason: 'No contact phone' };
     }
 
+    // Expand trigger event aliases
+    const triggerAliases = [triggerEvent];
+    if (triggerEvent === 'status_created' || triggerEvent === 'created') {
+      triggerAliases.push('on_card_created', 'status_created');
+    } else if (triggerEvent === 'status_completed' || triggerEvent === 'completed') {
+      triggerAliases.push('on_card_completed', 'on_status_change', 'status_completed');
+    } else {
+      triggerAliases.push('on_status_change');
+    }
+
+    // 2. Query active notification rules for this tenant & service
+    const { data: rules } = await supabase
+      .from('notification_rules')
+      .select('*')
+      .eq('tenant_id', card.tenant_id)
+      .eq('service_id', card.service_id)
+      .in('trigger_event', triggerAliases)
+      .eq('is_active', true);
+
     const templateVariables = {
       card_id: card.id,
       contact_name: contactName,
       service_title: serviceTitle,
-      status: card.status,
+      status: card.status === 'completed' ? 'Concluído' : card.status,
       attachment_url: card.attachment_url || '',
       ...(card.collected_data || {}),
       ...(card.attachment_metadata || {})
     };
 
     let dispatchedCount = 0;
-    for (const rule of rules) {
-      const messageText = interpolateTemplate(rule.template_body, templateVariables);
-      console.log(`[Notification Engine] Dispatching WhatsApp alert to ${contactPhone}: "${messageText}"`);
+
+    // Dispatched custom rules if configured
+    if (rules && rules.length > 0) {
+      for (const rule of rules) {
+        const messageText = interpolateTemplate(rule.template_body, templateVariables);
+        console.log(`[Notification Engine] Dispatching WhatsApp alert to ${contactPhone}: "${messageText}"`);
+
+        try {
+          const res = await sendWhatsAppMessage(contactPhone, messageText, card.tenant_id);
+          if (res?.success) dispatchedCount++;
+        } catch (err) {
+          console.error(`Failed sending WhatsApp message for rule ${rule.id}:`, err.message);
+        }
+      }
+    } else if (triggerEvent.includes('completed') || card.status === 'completed') {
+      // Default fallback confirmation message if no custom rules exist for completed cards
+      const defaultText = `Olá ${contactName}! Seu atendimento referente a *${serviceTitle}* foi concluído com sucesso. Obrigado pela preferência!`;
+      console.log(`[Notification Engine] Dispatching default WhatsApp completion alert to ${contactPhone}`);
 
       try {
-        await sendWhatsAppMessage(contactPhone, messageText);
-        dispatchedCount++;
+        const res = await sendWhatsAppMessage(contactPhone, defaultText, card.tenant_id);
+        if (res?.success) dispatchedCount++;
       } catch (err) {
-        console.error(`Failed sending WhatsApp message for rule ${rule.id}:`, err);
+        console.error(`Failed sending default WhatsApp completion message:`, err.message);
       }
+    } else {
+      console.log(`No active notification rule for service ${card.service_id} on triggers [${triggerAliases.join(', ')}]`);
     }
 
     return { success: true, dispatched: dispatchedCount };

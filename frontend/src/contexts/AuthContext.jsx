@@ -76,18 +76,25 @@ export function AuthProvider({ children, apiBaseUrl }) {
         throw new Error('Não foi possível autenticar o usuário. Verifique suas credenciais.');
       }
 
-      // 3. Fetch Tenant Details to check suspension status
+      // 3. Fetch Tenant Details to check suspension status (safe non-blocking check)
       const tenantId = profileData?.tenant_id || '00000000-0000-0000-0000-000000000001';
-      const tRes = await fetch(`${apiBaseUrl}/api/admin/tenants`);
-      if (tRes.ok) {
-        const tenants = await tRes.json();
-        const found = tenants.find(t => t.id === tenantId);
-        if (found) {
-          tenantData = found;
-          if (found.status === 'suspended' && profileData?.role !== 'super_admin') {
-            throw new Error(`A conta da empresa "${found.name}" está suspensa. Entre em contato com o suporte.`);
+      try {
+        const tRes = await fetch(`${apiBaseUrl}/api/admin/tenants`);
+        if (tRes.ok) {
+          const tenants = await tRes.json();
+          const found = tenants.find(t => t.id === tenantId);
+          if (found) {
+            tenantData = found;
+            if (found.status === 'suspended' && profileData?.role !== 'super_admin') {
+              throw new Error(`A conta da empresa "${found.name}" está suspensa. Entre em contato com o suporte.`);
+            }
           }
         }
+      } catch (tErr) {
+        if (tErr.message?.includes('suspensa')) {
+          throw tErr;
+        }
+        console.warn('Backend tenant check skipped or unreachable:', tErr.message);
       }
 
       const sessionObj = { user: userData, profile: profileData, tenant: tenantData };

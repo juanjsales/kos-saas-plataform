@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { getWhatsAppSessionStatus, logoutWhatsAppEngine, initWhatsAppEngine } from '../services/whatsapp.js';
-import fs from 'fs';
 
 const router = Router();
 
@@ -10,11 +9,8 @@ router.get('/status', async (req, res) => {
 
   let statusData = getWhatsAppSessionStatus(tenantId);
 
-  const authFolder = `baileys_auth_info_${tenantId}`;
-  const hasSavedSession = fs.existsSync(authFolder);
-
-  // Trigger engine init if disconnected and explicitly requested OR if saved session exists in DB/disk
-  if (!statusData.connected && (shouldInit || hasSavedSession)) {
+  // Trigger engine init ONLY when explicitly requested by user via init=true
+  if (!statusData.connected && shouldInit) {
     try {
       if (statusData.status === 'disconnected') {
         initWhatsAppEngine(tenantId).catch(err => {
@@ -23,7 +19,7 @@ router.get('/status', async (req, res) => {
       }
 
       // Wait up to 5 seconds for cloud hosting (Render.com) to receive QR code from WhatsApp servers
-      if (shouldInit && !statusData.connected && !statusData.qrCode) {
+      if (!statusData.connected && !statusData.qrCode) {
         for (let i = 0; i < 25; i++) {
           await new Promise(resolve => setTimeout(resolve, 200));
           statusData = getWhatsAppSessionStatus(tenantId);

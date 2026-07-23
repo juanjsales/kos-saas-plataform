@@ -421,18 +421,36 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                   onChange={(e) => handleFieldChange(index, 'field_label', e.target.value)}
                 />
 
-                <select
-                  className="input-control select-control"
-                  value={field.field_type}
-                  onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
-                >
-                  <option value="text">Texto Curto</option>
-                  <option value="number">Número</option>
-                  <option value="date">Data</option>
-                  <option value="select">Lista de Opções</option>
-                </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <select
+                    className="input-control select-control"
+                    value={field.field_type}
+                    onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
+                  >
+                    <option value="text">✏️ Texto Curto</option>
+                    <option value="textarea">📝 Texto Longo / Detalhes</option>
+                    <option value="number">🔢 Número / Valor</option>
+                    <option value="cpf">🪪 CPF / CNPJ</option>
+                    <option value="phone">📞 Telefone / WhatsApp</option>
+                    <option value="date">📅 Data (DD/MM/AAAA)</option>
+                    <option value="time">⏰ Horário (HH:MM)</option>
+                    <option value="select">📋 Lista de Seleção Única (Dropdown)</option>
+                    <option value="checkbox">☑️ Múltipla Escolha (Checkboxes)</option>
+                    <option value="file">📎 Anexo de Arquivo / Foto / PDF</option>
+                  </select>
 
-                <label className="checkbox-label" style={{ fontSize: '0.8rem' }}>
+                  {(field.field_type === 'select' || field.field_type === 'checkbox') && (
+                    <input
+                      type="text"
+                      className="input-control"
+                      placeholder="Opções separadas por vírgula. Ex: Matutino, Vespertino, Noturno"
+                      value={field.options || ''}
+                      onChange={(e) => handleFieldChange(index, 'options', e.target.value)}
+                    />
+                  )}
+                </div>
+
+                <label className="checkbox-label" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <input
                     type="checkbox"
                     checked={field.is_required}

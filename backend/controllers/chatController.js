@@ -12,6 +12,9 @@ export async function getChats(req, res) {
       .from('chats')
       .select('*')
       .eq('tenant_id', tenant_id)
+      .not('id', 'like', '%@lid%')
+      .not('id', 'like', '%status@broadcast%')
+      .not('id', 'like', '%@g.us%')
       .order('updated_at', { ascending: false });
 
     if (error) throw error;

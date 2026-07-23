@@ -266,21 +266,73 @@ export function CompletionModal({ card, tenantId, apiBaseUrl, onClose, onComplet
           {completionType === 'custom_fields' && targetService?.custom_fields?.length > 0 && (
             <div className="service-custom-fields-box glass-subcard" style={{ marginBottom: '16px', padding: '16px' }}>
               <h4 style={{ fontSize: '0.85rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <HelpCircle size={16} className="accent-icon" /> Checklist Final do Serviço ({targetService.title})
+                <HelpCircle size={16} className="accent-icon" /> Perguntas & Checklist do Serviço ({targetService.title})
               </h4>
               {targetService.custom_fields.map((field) => (
-                <div key={field.id} className="form-group" style={{ marginBottom: '10px' }}>
-                  <label className="form-label">
+                <div key={field.id} className="form-group" style={{ marginBottom: '12px' }}>
+                  <label className="form-label" style={{ fontWeight: '700' }}>
                     {field.field_label} {field.is_required && '*'}
                   </label>
-                  <input
-                    type={field.field_type === 'number' ? 'number' : 'text'}
-                    className="input-control"
-                    placeholder={`Informe ${field.field_label.toLowerCase()}`}
-                    value={collectedData[field.field_label] || ''}
-                    required={field.is_required}
-                    onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
-                  />
+                  {field.field_type === 'textarea' ? (
+                    <textarea
+                      className="input-control textarea-control"
+                      placeholder={`Informe ${field.field_label.toLowerCase()}`}
+                      value={collectedData[field.field_label] || ''}
+                      required={field.is_required}
+                      onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
+                    />
+                  ) : field.field_type === 'select' ? (
+                    <select
+                      className="input-control select-control"
+                      value={collectedData[field.field_label] || ''}
+                      required={field.is_required}
+                      onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
+                    >
+                      <option value="">-- Escolha uma opção --</option>
+                      {(field.options ? field.options.split(',') : []).map((opt, i) => (
+                        <option key={i} value={opt.trim()}>{opt.trim()}</option>
+                      ))}
+                    </select>
+                  ) : field.field_type === 'checkbox' ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' }}>
+                      {(field.options ? field.options.split(',') : ['Sim']).map((opt, i) => {
+                        const cleanOpt = opt.trim();
+                        const currentVal = collectedData[field.field_label] || '';
+                        const isChecked = currentVal.includes(cleanOpt);
+
+                        const handleToggle = () => {
+                          let arr = currentVal ? currentVal.split(', ').filter(Boolean) : [];
+                          if (isChecked) {
+                            arr = arr.filter(o => o !== cleanOpt);
+                          } else {
+                            arr.push(cleanOpt);
+                          }
+                          setCollectedData({ ...collectedData, [field.field_label]: arr.join(', ') });
+                        };
+
+                        return (
+                          <label key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={isChecked} onChange={handleToggle} />
+                            {cleanOpt}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <input
+                      type={
+                        field.field_type === 'number' ? 'number' :
+                        field.field_type === 'date' ? 'date' :
+                        field.field_type === 'time' ? 'time' :
+                        field.field_type === 'phone' ? 'tel' : 'text'
+                      }
+                      className="input-control"
+                      placeholder={field.field_type === 'cpf' ? '000.000.000-00' : `Informe ${field.field_label.toLowerCase()}`}
+                      value={collectedData[field.field_label] || ''}
+                      required={field.is_required}
+                      onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
+                    />
+                  )}
                 </div>
               ))}
             </div>

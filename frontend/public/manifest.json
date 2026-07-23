@@ -4,21 +4,14 @@
   "description": "Sistema simples de atendimento e mensagens automáticas para computador e celular",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
   "orientation": "any",
   "icons": [
     {
-      "src": "/pwa-192x192.png",
-      "sizes": "any",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa-512x512.png",
-      "sizes": "any",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
     }
   ]
 }

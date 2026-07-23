@@ -83,18 +83,24 @@ function AppContent() {
     } catch (err) {}
   };
 
+  // Polling effect for WhatsApp status & stats
   useEffect(() => {
     fetchStats();
-    let interval;
-    if (showQrModal && !waStatus.connected) {
-      checkWaStatus(true);
-      interval = setInterval(() => checkWaStatus(false), 3000);
-    } else {
-      checkWaStatus();
-      interval = setInterval(() => checkWaStatus(), 5000);
-    }
+    checkWaStatus();
+
+    const interval = setInterval(() => {
+      checkWaStatus(false);
+    }, 10000);
+
     return () => clearInterval(interval);
-  }, [showQrModal, waStatus.connected, tenantId]);
+  }, [tenantId]);
+
+  // Effect for QR code modal open
+  useEffect(() => {
+    if (showQrModal) {
+      checkWaStatus(true);
+    }
+  }, [showQrModal]);
 
   const handleNavigateFromChecklist = (target) => {
     if (target === 'whatsapp') {
@@ -110,13 +116,15 @@ function AppContent() {
   const handleDisconnectWa = async () => {
     if (!confirm('Deseja realmente desligar o WhatsApp deste sistema?')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/whatsapp/disconnect?tenant_id=${tenantId}`, {
+      const activeTenant = tenantId || profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+      const res = await fetch(`${API_BASE_URL}/api/whatsapp/disconnect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenantId })
+        body: JSON.stringify({ tenant_id: activeTenant })
       });
       if (res.ok) {
-        checkWaStatus();
+        setWaStatus({ connected: false, qrCode: null, status: 'disconnected' });
+        setShowQrModal(false);
       }
     } catch (err) {
       alert(`Erro ao desligar: ${err.message}`);
@@ -393,7 +401,7 @@ export default function App() {
 
   return (
     <AuthProvider apiBaseUrl={API_BASE_URL}>
-      <ThemeProvider apiBaseUrl={API_BASE_URL} tenantId="00000000-0000-0000-0000-000000000001" userRole="super_admin">
+      <ThemeProvider apiBaseUrl={API_BASE_URL}>
         <ProtectedRoute apiBaseUrl={API_BASE_URL}>
           <AppContent />
         </ProtectedRoute>
