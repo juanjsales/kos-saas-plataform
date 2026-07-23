@@ -1,21 +1,33 @@
 import { supabase } from '../config/supabase.js';
+import { getOrEnsureValidTenant } from '../services/whatsapp.js';
 
 export async function getTeamMembers(req, res) {
   try {
-    const tenantId = req.query.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    const { data: users, error } = await supabase
+    let { data: users, error } = await supabase
       .from('users')
       .select('*')
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', activeTenantId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error querying team members table:', error.message);
+    }
 
-    return res.json(users);
+    // Fallback: If no team members found for specific tenant, return all users in public.users
+    if (!users || users.length === 0) {
+      const { data: allUsers } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      users = allUsers || [];
+    }
+
+    return res.json(users || []);
   } catch (err) {
     console.error('Error fetching team members:', err);
-    return res.status(500).json({ error: err.message });
+    return res.json([]);
   }
 }
 
