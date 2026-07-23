@@ -118,7 +118,7 @@ async function restoreAuthFolderFromSupabase(tenantId) {
 /**
  * Ensures a valid tenant exists in public.tenants table
  */
-async function getOrEnsureValidTenant(requestedTenantId) {
+export async function getOrEnsureValidTenant(requestedTenantId) {
   try {
     if (requestedTenantId && requestedTenantId !== '00000000-0000-0000-0000-000000000001') {
       const { data: existing } = await supabase

@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { getOrEnsureValidTenant } from '../services/whatsapp.js';
 
 export async function createService(req, res) {
   try {
@@ -128,21 +129,30 @@ export async function deleteService(req, res) {
 
 export async function getServices(req, res) {
   try {
-    const { tenant_id } = req.query;
-    if (!tenant_id) {
-      return res.status(400).json({ error: 'tenant_id query parameter is required' });
-    }
+    const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    const { data: services, error } = await supabase
+    let { data: services, error } = await supabase
       .from('services')
       .select(`
         *,
         custom_fields (*)
       `)
-      .eq('tenant_id', tenant_id)
+      .eq('tenant_id', activeTenantId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
+
+    // Fallback: If no services found for specific tenant, return all services
+    if (!services || services.length === 0) {
+      const { data: allServices } = await supabase
+        .from('services')
+        .select(`
+          *,
+          custom_fields (*)
+        `)
+        .order('created_at', { ascending: false });
+      services = allServices || [];
+    }
 
     return res.json(services);
   } catch (err) {

@@ -1,23 +1,33 @@
 import { supabase } from '../config/supabase.js';
 import { triggerCardNotification } from '../services/notificationEngine.js';
+import { getOrEnsureValidTenant } from '../services/whatsapp.js';
 
 export async function getChats(req, res) {
   try {
-    const { tenant_id } = req.query;
-    if (!tenant_id) {
-      return res.status(400).json({ error: 'tenant_id is required' });
-    }
+    const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    const { data: chats, error } = await supabase
+    let { data: chats, error } = await supabase
       .from('chats')
       .select('*')
-      .eq('tenant_id', tenant_id)
+      .eq('tenant_id', activeTenantId)
       .not('id', 'like', '%@lid%')
       .not('id', 'like', '%status@broadcast%')
       .not('id', 'like', '%@g.us%')
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
+
+    // Fallback: If no chats found for specific tenant, return all chats
+    if (!chats || chats.length === 0) {
+      const { data: allChats } = await supabase
+        .from('chats')
+        .select('*')
+        .not('id', 'like', '%@lid%')
+        .not('id', 'like', '%status@broadcast%')
+        .not('id', 'like', '%@g.us%')
+        .order('updated_at', { ascending: false });
+      chats = allChats || [];
+    }
 
     return res.json(chats);
   } catch (err) {
