@@ -152,8 +152,15 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
         else if (onCompleted) onCompleted();
         onClose();
       } else {
-        const err = await res.json();
-        alert(`Erro na confirmação: ${err.error}`);
+        let errMessage = 'Erro na comunicação com o servidor.';
+        try {
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const err = await res.json();
+            errMessage = err.error || errMessage;
+          }
+        } catch (e) {}
+        alert(`Erro na confirmação: ${errMessage}`);
       }
     } catch (err) {
       alert(`Erro ao confirmar: ${err.message}`);
@@ -187,8 +194,15 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
         else if (onConfirmed) onConfirmed();
         onClose();
       } else {
-        const err = await res.json();
-        alert(`Erro ao concluir cartão: ${err.error}`);
+        let errMessage = 'Erro ao concluir o cartão no servidor.';
+        try {
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const err = await res.json();
+            errMessage = err.error || errMessage;
+          }
+        } catch (e) {}
+        alert(`Aviso: ${errMessage}`);
       }
     } catch (err) {
       alert(`Erro ao concluir: ${err.message}`);

@@ -22,6 +22,7 @@ router.get('/', getCards);
 router.patch('/:id/status', updateCardStatus);
 router.post('/:id/confirm', confirmCard);
 router.post('/analyze-attachment', upload.single('document'), analyzeCardAttachment);
+router.post('/:id/complete-attachment', upload.single('document'), completeCardWithAttachment);
 router.post('/:id/complete-with-attachment', upload.single('document'), completeCardWithAttachment);
 router.post('/:id/execute-automation', executeAutomation);
 
