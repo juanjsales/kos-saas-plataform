@@ -299,7 +299,7 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
 
                       {/* Small Hover & Collapsed Indicator Hint */}
                       <div className="card-expand-hint">
-                        <span>{isExpanded ? '▲ Detalhes Abertos' : '🔍 Passe o mouse ou clique para ver mais'}</span>
+                        <span>{isExpanded ? '▲ Detalhes Abertos' : '👉 Clique ou passe o mouse para ver os detalhes'}</span>
                         {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                       </div>
 
@@ -319,12 +319,12 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                         <div className="rpa-badge-container glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                             <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Bot size={12} className="accent-icon" /> Automação RPA:
+                              <Bot size={12} className="accent-icon" /> Preenchimento no Site:
                             </span>
                             <span className={`status-tag status-${autoStatus}`} style={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>
                               {autoStatus === 'idle' && '⚪ Inativo'}
-                              {autoStatus === 'running' && '🟡 Executando...'}
-                              {autoStatus === 'success' && '🟢 Sucesso'}
+                              {autoStatus === 'running' && '🟡 Digitando...'}
+                              {autoStatus === 'success' && '🟢 Concluído'}
                               {autoStatus === 'failed' && '🔴 Falha'}
                             </span>
                           </div>
@@ -336,9 +336,9 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                               disabled={isRpaRunning || !card.services?.external_url}
                               onClick={() => handleExecuteRpa(card)}
                               style={{ fontSize: '0.7rem', padding: '4px 8px', width: '100%', justifyContent: 'center' }}
-                              title={!card.services?.external_url ? 'Configure a external_url no ServiceBuilder' : 'Executar preenchimento no portal externo'}
+                              title={!card.services?.external_url ? 'Cadastre o site externo nas configurações do serviço' : 'Executar preenchimento no site'}
                             >
-                              {isRpaRunning ? <><RefreshCw size={12} className="spin" /> Executando...</> : <><Bot size={12} /> Executar RPA</>}
+                              {isRpaRunning ? <><RefreshCw size={12} className="spin" /> Digitando...</> : <><Bot size={12} /> Preencher no Site</>}
                             </button>
 
                             {card.automation_result && (
@@ -347,7 +347,7 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                                 className="btn secondary"
                                 onClick={() => setRpaCardResult({ card, result: card.automation_result })}
                                 style={{ fontSize: '0.7rem', padding: '4px 6px' }}
-                                title="Ver logs e print de comprovação"
+                                title="Ver comprovante da digitação"
                               >
                                 <Eye size={12} />
                               </button>
@@ -385,20 +385,20 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                             style={{ fontSize: '0.75rem', padding: '4px 8px', justifyContent: 'center' }}
                             onClick={() => setCardToConfirm(card)}
                           >
-                            <CheckSquare size={12} /> Confirmação & WhatsApp
+                            <CheckSquare size={12} /> 💬 Confirmar com o Cliente
                           </button>
 
                           <div>
-                            <label className="action-label">Mover para:</label>
+                            <label className="action-label">Mover este pedido para:</label>
                             <select
                               className="input-control select-sm"
                               value={card.status}
                               onChange={(e) => handleUpdateStatus(card, e.target.value)}
                             >
-                              <option value="created">Criados</option>
-                              <option value="in_progress">Em Andamento</option>
-                              <option value="completed">Concluídos</option>
-                              <option value="cancelled">Cancelados</option>
+                              <option value="created">1. Novos Pedidos</option>
+                              <option value="in_progress">2. Em Andamento</option>
+                              <option value="completed">3. Concluídos ✅</option>
+                              <option value="cancelled">4. Cancelados</option>
                             </select>
                           </div>
                         </div>
@@ -408,7 +408,7 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                 })}
 
                 {columnCards.length === 0 && (
-                  <div className="column-empty">Nenhum cartão nesta etapa. Arraste um cartão para cá!</div>
+                  <div className="column-empty">Nenhum pedido nesta coluna no momento.</div>
                 )}
               </div>
             </div>
@@ -424,9 +424,9 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
               <X size={20} />
             </button>
 
-            <h3><CalendarPlus size={22} className="accent-icon" /> Criar Novo Cartão de Atendimento</h3>
+            <h3><CalendarPlus size={22} className="accent-icon" /> ➕ Abrir Novo Pedido</h3>
             <p style={{ margin: '8px 0 16px', color: 'var(--text-secondary)' }}>
-              Preencha os dados abaixo para gerar um cartão no Kanban e disparar notificações automáticas:
+              Preencha os dados simples abaixo para cadastrar o cliente no quadro:
             </p>
 
             <form onSubmit={handleCreateCard}>

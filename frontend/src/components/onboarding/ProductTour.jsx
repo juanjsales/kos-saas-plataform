@@ -7,9 +7,9 @@ export function startProductTour() {
     showProgress: true,
     animate: true,
     allowClose: true,
-    doneBtnText: 'Concluir Tour 🚀',
-    nextBtnText: 'Próximo ➔',
-    prevBtnText: '← Anterior',
+    doneBtnText: 'Entendi Tudo! 🚀',
+    nextBtnText: 'Avançar ➔',
+    prevBtnText: '← Voltar',
     progressText: 'Passo {{current}} de {{total}}',
     onDestroyed: () => {
       localStorage.setItem('has_seen_tour', 'true');
@@ -18,8 +18,8 @@ export function startProductTour() {
       {
         element: '#tour-service-builder',
         popover: {
-          title: '👋 Bem-vindo! Crie ou Importe Serviços',
-          description: 'Aqui você cria novos serviços do zero ou escolhe templates 1-Click Setup pré-prontos para acelerar sua operação.',
+          title: '👋 Bem-vindo! Aqui você cadastra seus Serviços',
+          description: 'Nesta aba você adiciona os serviços que sua empresa oferece aos clientes (ex: Agendamentos, Consultas, Vendas ou Trabalhos).',
           side: 'bottom',
           align: 'start'
         }
@@ -27,8 +27,8 @@ export function startProductTour() {
       {
         element: '#tour-tab-form',
         popover: {
-          title: '📝 Formulários Personalizados No-Code',
-          description: 'Monte perguntas dinâmicas (texto, datas, seleção, uploads) para capturar todas as informações do cliente.',
+          title: '📝 Perguntas que o Cliente Deve Responder',
+          description: 'Crie perguntas simples (nome, data, fotos ou documentos) para guardar tudo o que o cliente precisa informar sobre o pedido.',
           side: 'bottom',
           align: 'start'
         }
@@ -36,8 +36,8 @@ export function startProductTour() {
       {
         element: '#tour-tab-rpa',
         popover: {
-          title: '🤖 Robô RPA (Preenchimento Externo)',
-          description: 'Mapeie o robô para acessar sites e portais governamentais ou sistemas legados e digitar os dados do cliente sozinho.',
+          title: '🤖 Preenchimento Automático do Sistema',
+          description: 'Se precisar digitar dados em outros portais ou sistemas, o robô do sistema pode preencher tudo para você sem complicação.',
           side: 'bottom',
           align: 'start'
         }
@@ -45,8 +45,8 @@ export function startProductTour() {
       {
         element: '#tour-tab-workflows',
         popover: {
-          title: '⚡ Réguas de Comunicação no WhatsApp',
-          description: 'Crie automações "Quando [Gatilho] ➔ Faça [Ação]" para notificar o cliente via WhatsApp e agendar lembretes automáticos.',
+          title: '💬 Avisos Automáticos pelo WhatsApp',
+          description: 'Configure mensagens para avisar o cliente no WhatsApp quando o pedido mudar de fase ou para enviar lembretes importantes.',
           side: 'bottom',
           align: 'start'
         }
@@ -54,8 +54,8 @@ export function startProductTour() {
       {
         element: '#tour-kanban-board',
         popover: {
-          title: '📌 Gestão Visual de Atendimentos no Kanban',
-          description: 'Arraste os cartões entre as etapas de atendimento para atualizar o status, acionar o robô RPA e disparar mensagens!',
+          title: '📌 Quadro Organizado de Pedidos',
+          description: 'Aqui você acompanha todos os seus clientes em colunas bem claras. Basta arrastar a cartela com o mouse para atualizar o pedido!',
           side: 'top',
           align: 'center'
         }

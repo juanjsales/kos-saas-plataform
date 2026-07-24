@@ -301,8 +301,8 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     <div id="tour-service-builder" className="builder-container glass-card">
       <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div>
-          <h2><Zap size={26} className="accent-icon" /> Construtor de Serviços & Automações No-Code</h2>
-          <p>Crie e edite serviços dinâmicos, réguas de comunicação e robôs RPA sem escrever código!</p>
+          <h2><Zap size={26} className="accent-icon" /> Cadastrar e Editar Serviços da Sua Empresa</h2>
+          <p>Configure o nome dos seus serviços, perguntas para os clientes e mensagens automáticas de forma muito fácil!</p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -323,7 +323,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
             onClick={() => setShowTemplatesModal(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
           >
-            <Sparkles size={18} /> Usar Template Pronto (1-Click Setup)
+            <Sparkles size={18} /> Usar um Modelo Já Pronto
           </button>
         </div>
       </div>
@@ -341,7 +341,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           className={`nocode-tab ${activeTab === 'form' ? 'active' : ''}`}
           onClick={() => setActiveTab('form')}
         >
-          <FileText size={18} /> 1. Formulário & Campos
+          <FileText size={18} /> 1. Perguntas do Serviço
         </button>
 
         <button
@@ -349,7 +349,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           className={`nocode-tab ${activeTab === 'confirmation' ? 'active' : ''}`}
           onClick={() => setActiveTab('confirmation')}
         >
-          <CheckCircle2 size={18} /> 2. Modal de Conclusão
+          <CheckCircle2 size={18} /> 2. Foto ou Recibo de Conclusão
         </button>
 
         <button
@@ -357,7 +357,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           className={`nocode-tab ${activeTab === 'rpa' ? 'active' : ''}`}
           onClick={() => setActiveTab('rpa')}
         >
-          <Bot size={18} /> 3. Robô RPA (Site Externo)
+          <Bot size={18} /> 3. Digitação Automática (Opcional)
         </button>
 
         <button
@@ -365,7 +365,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           className={`nocode-tab ${activeTab === 'workflows' ? 'active' : ''}`}
           onClick={() => setActiveTab('workflows')}
         >
-          <Zap size={18} /> 4. Réguas & WhatsApp
+          <Zap size={18} /> 4. Avisos Automáticos no WhatsApp
         </button>
       </div>
 
@@ -378,7 +378,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               <input
                 type="text"
                 className="input-control"
-                placeholder="Ex: Emissão de Segunda Via, Agendamento"
+                placeholder="Ex: Agendamento, Venda, Segunda Via, Consulta"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -390,7 +390,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               <input
                 type="text"
                 className="input-control"
-                placeholder="Descrição curta que aparece para o atendente..."
+                placeholder="Uma explicação curta sobre o que é esse serviço..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -402,7 +402,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
         {activeTab === 'form' && (
           <div className="glass-subcard" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileText size={20} className="accent-icon" /> Perguntas do Formulário (Campos Personalizados)
+              <FileText size={20} className="accent-icon" /> Perguntas que o Cliente ou Atendente Deve Preencher
             </h3>
 
             {customFields.map((field, index) => (
@@ -416,7 +416,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                 <input
                   type="text"
                   className="input-control"
-                  placeholder="Ex: Qual o seu CPF?, Endereço"
+                  placeholder="Escreva a pergunta (Ex: Qual o seu CPF?, Endereço)"
                   value={field.field_label}
                   onChange={(e) => handleFieldChange(index, 'field_label', e.target.value)}
                 />
@@ -427,23 +427,23 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                     value={field.field_type}
                     onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
                   >
-                    <option value="text">✏️ Texto Curto</option>
-                    <option value="textarea">📝 Texto Longo / Detalhes</option>
-                    <option value="number">🔢 Número / Valor</option>
-                    <option value="cpf">🪪 CPF / CNPJ</option>
-                    <option value="phone">📞 Telefone / WhatsApp</option>
-                    <option value="date">📅 Data (DD/MM/AAAA)</option>
-                    <option value="time">⏰ Horário (HH:MM)</option>
-                    <option value="select">📋 Lista de Seleção Única (Dropdown)</option>
-                    <option value="checkbox">☑️ Múltipla Escolha (Checkboxes)</option>
-                    <option value="file">📎 Anexo de Arquivo / Foto / PDF</option>
+                    <option value="text">✏️ Texto Curto (Ex: Nome)</option>
+                    <option value="textarea">📝 Texto Grande (Ex: Observações)</option>
+                    <option value="number">🔢 Número ou Valor R$</option>
+                    <option value="cpf">🪪 CPF ou CNPJ</option>
+                    <option value="phone">📞 Telefone com DDD</option>
+                    <option value="date">📅 Data (Dia/Mês/Ano)</option>
+                    <option value="time">⏰ Horário (Hora:Minuto)</option>
+                    <option value="select">📋 Lista de Opções para Escolher</option>
+                    <option value="checkbox">☑️ Caixas para Marcar Várias Opções</option>
+                    <option value="file">📎 Foto / Documento PDF</option>
                   </select>
 
                   {(field.field_type === 'select' || field.field_type === 'checkbox') && (
                     <input
                       type="text"
                       className="input-control"
-                      placeholder="Opções separadas por vírgula. Ex: Matutino, Vespertino, Noturno"
+                      placeholder="Opções separadas por vírgula. Ex: Manhã, Tarde, Noite"
                       value={field.options || ''}
                       onChange={(e) => handleFieldChange(index, 'options', e.target.value)}
                     />
@@ -475,7 +475,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
         {activeTab === 'confirmation' && (
           <div className="glass-subcard" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={20} className="accent-icon" /> Tipo de Modal Exibido ao Concluir Atendimento
+              <CheckCircle2 size={20} className="accent-icon" /> O que o atendente deve enviar ao terminar o serviço:
             </h3>
 
             <div className="form-group">
@@ -485,10 +485,10 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                 onChange={(e) => setCompletionType(e.target.value)}
                 style={{ fontWeight: '600' }}
               >
-                <option value="identity">🆔 Leitura de Identidade (RG/CPF) - Extração Automática via OCR</option>
-                <option value="financial">🧾 Comprovante Financeiro / Nota Fiscal - Leitura R$, NFE e Data</option>
-                <option value="custom_fields">📋 Checklist das Perguntas Personalizadas do Serviço</option>
-                <option value="simple">📝 Confirmação Simples com Observações</option>
+                <option value="identity">🆔 Foto do Documento (RG / CPF) com leitura automática de dados</option>
+                <option value="financial">🧾 Comprovante / Recibo / Nota Fiscal com leitura do Valor R$</option>
+                <option value="custom_fields">📋 Responder as perguntas cadastradas do serviço</option>
+                <option value="simple">📝 Apenas uma mensagem simples de confirmação</option>
               </select>
             </div>
           </div>
@@ -498,11 +498,11 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
         {activeTab === 'rpa' && (
           <div className="glass-subcard" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-accent)' }}>
-              <Bot size={20} /> Automação de Preenchimento em Portal Externo (Robô RPA)
+              <Bot size={20} /> Digitação Automática em Outros Portais (Opcional)
             </h3>
 
             <div className="form-group">
-              <label className="form-label"><Globe size={14} /> URL do Site / Portal Externo</label>
+              <label className="form-label"><Globe size={14} /> Endereço (URL) do Site Externo</label>
               <input
                 type="url"
                 className="input-control"
@@ -514,7 +514,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
             <div style={{ marginTop: '16px' }}>
               <label className="form-label" style={{ fontWeight: '600' }}>
-                Mapeamento Visual "De/Para" (Seletor CSS no Site vs. Dados do Formulário):
+                Quais dados o robô deve digitar no outro site:
               </label>
 
               {automationMappings.map((mapRow, idx) => (
@@ -522,7 +522,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                   <input
                     type="text"
                     className="input-control"
-                    placeholder="Seletor CSS no Site (Ex: #input-cpf, input[name='nome'])"
+                    placeholder="Campo no outro site (Ex: #input-cpf)"
                     value={mapRow.css_selector}
                     onChange={(e) => handleMappingChange(idx, 'css_selector', e.target.value)}
                   />
@@ -544,7 +544,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               ))}
 
               <button type="button" className="btn secondary" onClick={addMappingRow} style={{ marginTop: '8px', fontSize: '0.8rem' }}>
-                <Plus size={14} /> Adicionar Mapeamento "De/Para"
+                <Plus size={14} /> Adicionar Novo Campo para Digitação
               </button>
             </div>
           </div>
@@ -555,15 +555,15 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           <div>
             <div className="glass-subcard" style={{ padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '1rem', color: 'var(--secondary-accent)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={20} /> Construtor de Réguas No-Code ("Quando [Gatilho] ➔ Faça [Ação]")
+                <Zap size={20} /> Configurar Avisos Automáticos ("Quando acontecer algo ➔ Enviar mensagem")
               </h3>
 
               <div className="form-group">
-                <label className="form-label">Nome da Régua de Automação</label>
+                <label className="form-label">Título do Aviso</label>
                 <input
                   type="text"
                   className="input-control"
-                  placeholder="Ex: Confirmar Agendamento via WhatsApp após 30 min"
+                  placeholder="Ex: Avisar o cliente que o trabalho ficou pronto"
                   value={newRuleTitle}
                   onChange={(e) => setNewRuleTitle(e.target.value)}
                 />
@@ -571,42 +571,42 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
               <div className="form-group-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
-                  <label className="form-label">Gatilho Disparador</label>
+                  <label className="form-label">Quando deve enviar?</label>
                   <select
                     className="input-control select-control"
                     value={newRuleTrigger}
                     onChange={(e) => setNewRuleTrigger(e.target.value)}
                   >
-                    <option value="on_card_created">⚡ Quando o Cartão for Criado</option>
-                    <option value="on_status_change">🔄 Quando o Status Mudar</option>
-                    <option value="on_time_offset">⏰ Lembrete Temporal (X minutos depois)</option>
-                    <option value="on_rpa_success">🤖 Quando o RPA for Concluído com Sucesso</option>
+                    <option value="on_card_created">⚡ Quando um novo pedido for aberto</option>
+                    <option value="on_status_change">🔄 Quando o pedido mudar de etapa</option>
+                    <option value="on_time_offset">⏰ Enviar lembrete após alguns minutos</option>
+                    <option value="on_rpa_success">🤖 Quando o robô terminar a digitação</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Ação a Ser Executada</label>
+                  <label className="form-label">O que deve fazer?</label>
                   <select
                     className="input-control select-control"
                     value={newRuleAction}
                     onChange={(e) => setNewRuleAction(e.target.value)}
                   >
-                    <option value="send_whatsapp">💬 Disparar Mensagem no WhatsApp</option>
-                    <option value="run_rpa">🤖 Executar Robô RPA em Site Externo</option>
-                    <option value="move_card_status">📌 Mover Status do Cartão</option>
+                    <option value="send_whatsapp">💬 Enviar mensagem automática no WhatsApp</option>
+                    <option value="run_rpa">🤖 Ativar preenchimento automático no site</option>
+                    <option value="move_card_status">📌 Mover o pedido para outra etapa</option>
                   </select>
                 </div>
               </div>
 
               <button type="button" className="btn secondary" onClick={addWorkflowRule}>
-                <Plus size={16} /> Adicionar Régua ao Serviço
+                <Plus size={16} /> Adicionar Aviso ao Serviço
               </button>
             </div>
           </div>
         )}
 
         <button type="submit" className="btn primary submit-btn" disabled={loading} style={{ marginTop: '28px', width: '100%', padding: '14px', justifyContent: 'center' }}>
-          {loading ? 'Salvando Configurações...' : editingServiceId ? <><Edit3 size={20} /> Salvar Alterações no Serviço</> : <><CheckCircle2 size={20} /> Salvar Novo Serviço & Automações No-Code</>}
+          {loading ? 'Salvando...' : editingServiceId ? <><Edit3 size={20} /> Salvar Alterações no Serviço</> : <><CheckCircle2 size={20} /> Salvar Serviço</>}
         </button>
       </form>
 

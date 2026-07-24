@@ -52,7 +52,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
         onClick={() => setIsOpen(!isOpen)}
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justify: 'space-between',
           alignItems: 'center',
           padding: '14px 16px',
           cursor: 'pointer',
@@ -63,7 +63,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Sparkles size={18} style={{ color: 'var(--primary-accent)' }} />
           <span style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-            Checklist de Configuração ({completedItems}/{totalItems})
+            Passo a Passo Inicial ({completedItems}/{totalItems})
           </span>
         </div>
         {isOpen ? <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronUp size={18} style={{ color: 'var(--text-muted)' }} />}
@@ -95,7 +95,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                fontSize: '0.82rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 color: 'var(--text-primary)',
                 opacity: progress.whatsapp ? 0.6 : 1,
@@ -104,7 +104,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             >
               <CheckCircle2 size={16} style={{ color: progress.whatsapp ? 'var(--secondary-accent)' : 'var(--text-muted)' }} />
               <MessageSquare size={14} style={{ color: 'var(--primary-accent)' }} />
-              <span>Conectar conta do WhatsApp</span>
+              <span>1. Conectar o WhatsApp da empresa</span>
             </li>
 
             {/* Step 2: Service */}
@@ -114,7 +114,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                fontSize: '0.82rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 color: 'var(--text-primary)',
                 opacity: progress.service ? 0.6 : 1,
@@ -123,7 +123,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             >
               <CheckCircle2 size={16} style={{ color: progress.service ? 'var(--secondary-accent)' : 'var(--text-muted)' }} />
               <Layers size={14} style={{ color: 'var(--primary-accent)' }} />
-              <span>Criar ou importar 1º Serviço</span>
+              <span>2. Cadastrar o 1º Serviço ou Trabalho</span>
             </li>
 
             {/* Step 3: Workflow Rule */}
@@ -133,7 +133,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                fontSize: '0.82rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 color: 'var(--text-primary)',
                 opacity: progress.rule ? 0.6 : 1,
@@ -142,7 +142,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             >
               <CheckCircle2 size={16} style={{ color: progress.rule ? 'var(--secondary-accent)' : 'var(--text-muted)' }} />
               <Zap size={14} style={{ color: 'var(--primary-accent)' }} />
-              <span>Ativar Regra de Mensagem / Lembrete</span>
+              <span>3. Ativar Avisos pelo WhatsApp</span>
             </li>
 
             {/* Step 4: Kanban Card */}
@@ -152,7 +152,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                fontSize: '0.82rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 color: 'var(--text-primary)',
                 opacity: progress.card ? 0.6 : 1,
@@ -161,7 +161,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             >
               <CheckCircle2 size={16} style={{ color: progress.card ? 'var(--secondary-accent)' : 'var(--text-muted)' }} />
               <LayoutGrid size={14} style={{ color: 'var(--primary-accent)' }} />
-              <span>Mover o 1º Card no Kanban</span>
+              <span>4. Mover o 1º Pedido no Quadro</span>
             </li>
 
           </ul>
@@ -171,11 +171,11 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
               type="button"
               className="btn secondary"
               onClick={startProductTour}
-              style={{ fontSize: '0.75rem', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              style={{ fontSize: '0.75rem', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <HelpCircle size={12} /> Reiniciar Tour
+              <HelpCircle size={14} /> Ver Ajuda Passo a Passo
             </button>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No-Code Onboarding</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guia do Sistema</span>
           </div>
         </div>
       )}

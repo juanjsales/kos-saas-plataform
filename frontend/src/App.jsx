@@ -252,14 +252,14 @@ function AppContent() {
                 className={`tab-btn ${activeTab === 'kanban' ? 'active' : ''}`}
                 onClick={() => setActiveTab('kanban')}
               >
-                <LayoutGrid size={18} /> 1. Fila de Atendimentos
+                <LayoutGrid size={18} /> 1. Quadro de Pedidos
               </button>
 
               <button
                 className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
                 onClick={() => setActiveTab('chat')}
               >
-                <MessageSquare size={18} /> 2. Conversas
+                <MessageSquare size={18} /> 2. Conversas no WhatsApp
               </button>
 
               {userRole === 'tenant_admin' && (
@@ -267,7 +267,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`}
                   onClick={() => setActiveTab('services')}
                 >
-                  <Layers size={18} /> 3. Criar Serviços
+                  <Layers size={18} /> 3. Cadastrar Serviços
                 </button>
               )}
 
@@ -276,7 +276,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
                   onClick={() => setActiveTab('notifications')}
                 >
-                  <Bell size={18} /> 4. Mensagens Automáticas
+                  <Bell size={18} /> 4. Lembretes e Avisos
                 </button>
               )}
 
@@ -285,7 +285,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'team' ? 'active' : ''}`}
                   onClick={() => setActiveTab('team')}
                 >
-                  <Users size={18} /> 5. Meus Ajudantes
+                  <Users size={18} /> 5. Nossa Equipe
                 </button>
               )}
 
@@ -293,7 +293,7 @@ function AppContent() {
                 className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
                 onClick={() => setActiveTab('profile')}
               >
-                <Palette size={18} /> Cores e Letras
+                <Palette size={18} /> ⚙️ Mudar Cores e Senha
               </button>
             </>
           )}

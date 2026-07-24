@@ -10,10 +10,10 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
 
   // Available triggers
   const triggers = [
-    { event: 'card_created', label: 'Cartão Criado / Atendimento Solicitado' },
-    { event: 'status_in_progress', label: 'Status Alterado para: Em Andamento' },
-    { event: 'status_completed', label: 'Status Alterado para: Concluído' },
-    { event: 'status_cancelled', label: 'Status Alterado para: Cancelado' }
+    { event: 'card_created', label: '1. Quando um Novo Pedido for Aberto' },
+    { event: 'status_in_progress', label: '2. Quando o Pedido for para: Em Andamento' },
+    { event: 'status_completed', label: '3. Quando o Pedido for para: Concluído' },
+    { event: 'status_cancelled', label: '4. Quando o Pedido for para: Cancelado' }
   ];
 
   const fetchServices = async () => {
@@ -81,7 +81,7 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
       });
 
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Regra de notificação salva com sucesso!' });
+        setMessage({ type: 'success', text: 'Mensagem salva com sucesso!' });
         fetchRules(selectedServiceId);
       } else {
         const err = await res.json();
@@ -97,8 +97,8 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
   return (
     <div className="notification-settings-container glass-card">
       <div className="section-header">
-        <h2><Bell size={24} className="accent-icon" /> Painel de Configurações de Notificações Automáticas</h2>
-        <p>Defina mensagens automáticas no WhatsApp para cada mudança de status do atendimento.</p>
+        <h2><Bell size={24} className="accent-icon" /> Lembretes e Avisos Automáticos pelo WhatsApp</h2>
+        <p>Escreva a mensagem que o cliente vai receber automaticamente no WhatsApp em cada etapa do trabalho.</p>
       </div>
 
       {message && (
@@ -108,7 +108,7 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
       )}
 
       <div className="form-group service-selector">
-        <label className="form-label">Selecione o Serviço para Configurar Regras:</label>
+        <label className="form-label" style={{ fontWeight: '700' }}>Escolha o Serviço:</label>
         <select
           className="input-control select-control"
           value={selectedServiceId}
@@ -120,20 +120,19 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
         </select>
       </div>
 
-      <div className="placeholder-info-box glass-subcard">
-        <h4><Info size={16} /> Variáveis disponíveis para o modelo de mensagem no WhatsApp:</h4>
-        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-          <code className="var-tag">&#123;contact_name&#125;</code>
-          <code className="var-tag">&#123;service_title&#125;</code>
-          <code className="var-tag">&#123;status&#125;</code>
-          <code className="var-tag">&#123;rg_number&#125;</code>
-          <code className="var-tag">&#123;cpf&#125;</code>
-          <code className="var-tag">&#123;full_name&#125;</code>
-          <code className="var-tag">&#123;birth_date&#125;</code>
-          <code className="var-tag">&#123;issuing_organ&#125;</code>
-          <code className="var-tag">&#123;document_number&#125;</code>
-          <code className="var-tag">&#123;notes&#125;</code>
-          <code className="var-tag">&#123;NomeDaPerguntaPersonalizada&#125;</code>
+      <div className="placeholder-info-box glass-subcard" style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
+        <h4 style={{ fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Info size={16} /> Palavras mágicas que o sistema substitui sozinho no texto:
+        </h4>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '8px' }}>
+          Copie e cole qualquer uma dessas palavras abaixo dentro do seu texto:
+        </p>
+        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <code className="var-tag">&#123;contact_name&#125; (Nome do Cliente)</code>
+          <code className="var-tag">&#123;service_title&#125; (Nome do Serviço)</code>
+          <code className="var-tag">&#123;status&#125; (Situação Atual)</code>
+          <code className="var-tag">&#123;document_number&#125; (Nº do Recibo/Nota)</code>
+          <code className="var-tag">&#123;notes&#125; (Observações)</code>
         </div>
       </div>
 
@@ -165,29 +164,29 @@ function RuleCard({ label, rule, onSave, loading }) {
   }, [rule]);
 
   return (
-    <div className={`rule-card glass-subcard ${isActive ? 'active-rule' : ''}`}>
-      <div className="rule-card-header">
-        <div className="rule-title-group">
-          <Power size={18} className={isActive ? 'power-on' : 'power-off'} />
-          <h3>{label}</h3>
+    <div className={`rule-card glass-subcard ${isActive ? 'active-rule' : ''}`} style={{ padding: '18px', marginBottom: '16px', borderRadius: '12px' }}>
+      <div className="rule-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div className="rule-title-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Power size={18} style={{ color: isActive ? '#10b981' : 'var(--text-muted)' }} />
+          <h3 style={{ fontSize: '0.95rem', fontWeight: '700', margin: 0 }}>{label}</h3>
         </div>
 
         {/* Toggle Switch */}
-        <label className="toggle-switch">
+        <label className="toggle-switch" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem' }}>
           <input
             type="checkbox"
             checked={isActive}
             onChange={(e) => setIsActive(e.target.checked)}
           />
-          <span className="slider round"></span>
+          <span>{isActive ? 'Ativado ✅' : 'Desativado ❌'}</span>
         </label>
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Mensagem do WhatsApp (Template Body)</label>
+      <div className="form-group" style={{ marginBottom: '12px' }}>
+        <label className="form-label">Texto da Mensagem Enviada ao Cliente:</label>
         <textarea
           className="input-control textarea-control"
-          placeholder="Ex: Olá {contact_name}, seu atendimento para {service_title} foi atualizado para: {status}."
+          placeholder="Ex: Olá {contact_name}, seu atendimento para {service_title} foi atualizado com sucesso!"
           value={templateBody}
           onChange={(e) => setTemplateBody(e.target.value)}
           rows={3}
@@ -199,8 +198,9 @@ function RuleCard({ label, rule, onSave, loading }) {
         className="btn primary save-rule-btn"
         disabled={loading}
         onClick={() => onSave(isActive, templateBody)}
+        style={{ padding: '8px 16px' }}
       >
-        <Save size={16} /> Salvar Regra
+        <Save size={16} /> Salvar Esta Mensagem
       </button>
     </div>
   );
