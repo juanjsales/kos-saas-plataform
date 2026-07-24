@@ -675,22 +675,22 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
             {services.map((service) => (
-              <div key={service.id} className="glass-card" style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.5)', border: editingServiceId === service.id ? '2px solid var(--primary-accent)' : '1px solid var(--border-glass)' }}>
+              <div key={service.id} className="glass-card" style={{ padding: '16px', borderRadius: '14px', background: 'var(--bg-card)', border: editingServiceId === service.id ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <h4 style={{ fontSize: '0.95rem', margin: 0, fontWeight: '700' }}>{service.title}</h4>
-                  <span className="badge" style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>{service.completion_type}</span>
+                  <h4 style={{ fontSize: '1rem', margin: 0, fontWeight: '800', color: 'var(--text-primary)' }}>{service.title}</h4>
+                  <span className="badge" style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 8px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary-accent)', borderRadius: '6px' }}>{service.completion_type}</span>
                 </div>
 
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', minHeight: '32px' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '14px', minHeight: '36px' }}>
                   {service.description || 'Sem descrição cadastrada'}
                 </p>
 
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-glass)', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-light)', paddingTop: '12px' }}>
                   <button
                     type="button"
                     className="btn secondary"
                     onClick={() => handleStartEditService(service)}
-                    style={{ fontSize: '0.78rem', padding: '6px 10px', gap: '4px' }}
+                    style={{ fontSize: '0.82rem', padding: '8px 12px', gap: '6px' }}
                   >
                     <Edit3 size={14} /> Editar
                   </button>
@@ -699,7 +699,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                     type="button"
                     className="btn danger"
                     onClick={() => handleDeleteService(service.id, service.title)}
-                    style={{ fontSize: '0.78rem', padding: '6px 10px', gap: '4px' }}
+                    style={{ fontSize: '0.82rem', padding: '8px 12px', gap: '6px' }}
                   >
                     <Trash2 size={14} /> Excluir
                   </button>

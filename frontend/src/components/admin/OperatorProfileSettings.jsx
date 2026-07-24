@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Palette, Moon, Sun, Monitor, CheckCircle2, User, LayoutGrid, KeyRound, Check, AlertCircle } from 'lucide-react';
+import { Palette, Moon, Sun, Monitor, CheckCircle2, User, LayoutGrid, KeyRound, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../config/supabaseClient';
 
