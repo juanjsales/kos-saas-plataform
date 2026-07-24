@@ -183,11 +183,32 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
         status: 'completed'
       };
 
-      const res = await fetch(`${apiBaseUrl}/api/cards/${card.id}/complete-attachment`, {
+      let res = await fetch(`${apiBaseUrl}/api/cards/${card.id}/complete-attachment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+
+      // Fallback 1: Try complete-with-attachment if complete-attachment returned 404
+      if (res.status === 404) {
+        res = await fetch(`${apiBaseUrl}/api/cards/${card.id}/complete-with-attachment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      // Fallback 2: Direct PATCH status update if both attachment routes 404
+      if (res.status === 404) {
+        res = await fetch(`${apiBaseUrl}/api/cards/${card.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'completed',
+            collected_data: collectedData
+          })
+        });
+      }
 
       if (res.ok) {
         if (onCompleted) onCompleted();
