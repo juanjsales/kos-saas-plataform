@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
 
-export function startProductTour() {
+export function startProductTour(accountKey = 'default') {
+  const key = accountKey || 'default';
   const driverObj = driver({
     showProgress: true,
     animate: true,
@@ -12,7 +13,7 @@ export function startProductTour() {
     prevBtnText: '← Voltar',
     progressText: 'Passo {{current}} de {{total}}',
     onDestroyed: () => {
-      localStorage.setItem('has_seen_tour', 'true');
+      localStorage.setItem(`has_seen_tour_${key}`, 'true');
     },
     steps: [
       {
@@ -66,15 +67,16 @@ export function startProductTour() {
   driverObj.drive();
 }
 
-export function ProductTourAutoStart() {
+export function ProductTourAutoStart({ accountKey = 'default' }) {
   useEffect(() => {
-    const hasSeen = localStorage.getItem('has_seen_tour');
+    const key = accountKey || 'default';
+    const hasSeen = localStorage.getItem(`has_seen_tour_${key}`);
     if (!hasSeen) {
       setTimeout(() => {
-        startProductTour();
+        startProductTour(key);
       }, 1000);
     }
-  }, []);
+  }, [accountKey]);
 
   return null;
 }

@@ -19,6 +19,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
   // Tab 2: Confirmation & Modals
   const [completionType, setCompletionType] = useState('identity');
+  const [confirmationTemplate, setConfirmationTemplate] = useState('Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
   const [requireDocumentUpload, setRequireDocumentUpload] = useState(true);
 
   // Tab 3: RPA Automation
@@ -62,6 +63,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setTitle(service.title || '');
     setDescription(service.description || '');
     setCompletionType(service.completion_type || 'identity');
+    setConfirmationTemplate(service.confirmation_template || 'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
     setExternalUrl(service.external_url || '');
 
     if (service.custom_fields && service.custom_fields.length > 0) {
@@ -96,6 +98,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setTitle('');
     setDescription('');
     setCompletionType('identity');
+    setConfirmationTemplate('Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
     setExternalUrl('');
     setSubmitSelector('');
     setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
@@ -245,6 +248,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           title,
           description,
           completion_type: completionType,
+          confirmation_template: confirmationTemplate,
           external_url: externalUrl || null,
           automation_mapping: automationPayload,
           custom_fields: validFields
@@ -478,7 +482,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               <CheckCircle2 size={20} className="accent-icon" /> O que o atendente deve enviar ao terminar o serviço:
             </h3>
 
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: '20px' }}>
               <select
                 className="input-control select-control"
                 value={completionType}
@@ -490,6 +494,26 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
                 <option value="custom_fields">📋 Responder as perguntas cadastradas do serviço</option>
                 <option value="simple">📝 Apenas uma mensagem simples de confirmação</option>
               </select>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '16px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
+              <label className="form-label" style={{ fontWeight: '700', fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MessageSquare size={16} style={{ color: '#25D366' }} /> Texto da Mensagem enviada ao WhatsApp do Cliente ao Confirmar:
+              </label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Altere aqui o texto exato que o dono e os funcionários enviam para o celular do cliente ao clicar no botão de confirmação:
+              </p>
+              <textarea
+                className="input-control textarea-control"
+                placeholder="Ex: Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!"
+                value={confirmationTemplate}
+                onChange={(e) => setConfirmationTemplate(e.target.value)}
+                rows={4}
+                style={{ fontSize: '0.9rem', lineHeight: '1.5' }}
+              />
+              <span style={{ fontSize: '0.78rem', color: 'var(--primary-accent)', marginTop: '6px', display: 'block' }}>
+                💡 Você pode usar &#123;contact_name&#125;, &#123;service_title&#125;, &#123;status&#125; ou o nome de qualquer pergunta no texto!
+              </span>
             </div>
           </div>
         )}

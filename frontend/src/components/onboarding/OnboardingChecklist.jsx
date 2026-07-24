@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Sparkles, MessageSquare, Layers, Zap, LayoutGrid, HelpCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Sparkles, MessageSquare, Layers, Zap, LayoutGrid, HelpCircle, X } from 'lucide-react';
 import { startProductTour } from './ProductTour';
 
-export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceCount, cardsCount }) {
+export function OnboardingChecklist({ accountKey = 'default', onNavigateTab, whatsappConnected, serviceCount, cardsCount }) {
+  const key = accountKey || 'default';
   const [isOpen, setIsOpen] = useState(true);
+  const [isDismissed, setIsDismissed] = useState(false);
   const [progress, setProgress] = useState({
     whatsapp: false,
     service: false,
@@ -12,21 +14,68 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
   });
 
   useEffect(() => {
+    const dismissed = localStorage.getItem(`onboarding_dismissed_${key}`) === 'true';
+    setIsDismissed(dismissed);
+  }, [key]);
+
+  useEffect(() => {
     const hasService = serviceCount > 0;
     const hasCard = cardsCount > 0;
 
-    setProgress(prev => ({
-      ...prev,
+    setProgress({
       whatsapp: !!whatsappConnected,
       service: hasService,
       card: hasCard,
       rule: hasService
-    }));
+    });
   }, [whatsappConnected, serviceCount, cardsCount]);
 
   const completedItems = Object.values(progress).filter(Boolean).length;
   const totalItems = 4;
   const percentage = Math.round((completedItems / totalItems) * 100);
+
+  const handleDismiss = (e) => {
+    e.stopPropagation();
+    localStorage.setItem(`onboarding_dismissed_${key}`, 'true');
+    setIsDismissed(true);
+  };
+
+  const handleReopen = () => {
+    localStorage.setItem(`onboarding_dismissed_${key}`, 'false');
+    setIsDismissed(false);
+    setIsOpen(true);
+  };
+
+  // Small floating trigger button if user closed checklist for this account
+  if (isDismissed) {
+    return (
+      <button
+        type="button"
+        className="btn secondary glass-card"
+        onClick={handleReopen}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          padding: '8px 14px',
+          borderRadius: '20px',
+          fontSize: '0.8rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          boxShadow: 'var(--shadow-md)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-light)'
+        }}
+        title="Abrir o Passo a Passo Inicial da Conta"
+      >
+        <Sparkles size={16} style={{ color: 'var(--primary-accent)' }} />
+        <span>Ajuda Inicial ({completedItems}/{totalItems})</span>
+      </button>
+    );
+  }
 
   return (
     <div
@@ -66,7 +115,19 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             Passo a Passo Inicial ({completedItems}/{totalItems})
           </span>
         </div>
-        {isOpen ? <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronUp size={18} style={{ color: 'var(--text-muted)' }} />}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {isOpen ? <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronUp size={18} style={{ color: 'var(--text-muted)' }} />}
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={handleDismiss}
+            title="Ocultar passo a passo desta conta"
+            style={{ padding: '2px', marginLeft: '4px' }}
+          >
+            <X size={16} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
       </div>
 
       {/* Dynamic Theme Gradient Progress Bar */}
@@ -170,12 +231,12 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
             <button
               type="button"
               className="btn secondary"
-              onClick={startProductTour}
+              onClick={() => startProductTour(key)}
               style={{ fontSize: '0.75rem', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <HelpCircle size={14} /> Ver Ajuda Passo a Passo
             </button>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guia do Sistema</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guia da Conta</span>
           </div>
         </div>
       )}

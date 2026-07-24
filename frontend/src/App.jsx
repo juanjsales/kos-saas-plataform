@@ -141,10 +141,11 @@ function AppContent() {
   return (
     <div className="app-shell">
       <OfflineBanner />
-      <ProductTourAutoStart />
+      <ProductTourAutoStart accountKey={tenantId || user?.id || 'default'} />
 
       {!isSuperAdmin && (
         <OnboardingChecklist
+          accountKey={tenantId || user?.id || 'default'}
           onNavigateTab={handleNavigateFromChecklist}
           whatsappConnected={waStatus.connected}
           serviceCount={serviceCount}

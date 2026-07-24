@@ -188,7 +188,7 @@ export async function confirmCard(req, res) {
       console.log(`[Card Confirmation] Dispatching WhatsApp confirmation message to ${contactPhone}: "${finalMessageText}"`);
 
       try {
-        await sendWhatsAppMessage(contactPhone, finalMessageText);
+        await sendWhatsAppMessage(contactPhone, finalMessageText, card.tenant_id);
       } catch (err) {
         console.error('Failed sending WhatsApp confirmation message:', err);
       }

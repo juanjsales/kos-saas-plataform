@@ -36,6 +36,28 @@ export function interpolateTemplate(template, data) {
   return result;
 }
 
+// Deduplication cache to prevent sending duplicate messages within 5 seconds
+const recentDispatches = new Map();
+
+function isDuplicateDispatch(cardId, phone, text) {
+  const key = `${cardId}_${phone}_${text?.trim()}`;
+  const now = Date.now();
+  if (recentDispatches.has(key)) {
+    const lastTime = recentDispatches.get(key);
+    if (now - lastTime < 5000) { // 5-second window
+      return true;
+    }
+  }
+  recentDispatches.set(key, now);
+  // Cleanup old entries
+  if (recentDispatches.size > 200) {
+    for (const [k, time] of recentDispatches.entries()) {
+      if (now - time > 10000) recentDispatches.delete(k);
+    }
+  }
+  return false;
+}
+
 /**
  * Triggers notification check and message dispatch for a given card event
  */
@@ -107,6 +129,12 @@ export async function triggerCardNotification(cardId, triggerEvent) {
     if (rules && rules.length > 0) {
       for (const rule of rules) {
         const messageText = interpolateTemplate(rule.template_body, templateVariables);
+        
+        if (isDuplicateDispatch(card.id, contactPhone, messageText)) {
+          console.log(`[Notification Engine] Skipping duplicate WhatsApp alert to ${contactPhone}: "${messageText}"`);
+          continue;
+        }
+
         console.log(`[Notification Engine] Dispatching WhatsApp alert to ${contactPhone}: "${messageText}"`);
 
         try {
@@ -119,13 +147,15 @@ export async function triggerCardNotification(cardId, triggerEvent) {
     } else if (triggerEvent.includes('completed') || card.status === 'completed') {
       // Default fallback confirmation message if no custom rules exist for completed cards
       const defaultText = `Olá ${contactName}! Seu atendimento referente a *${serviceTitle}* foi concluído com sucesso. Obrigado pela preferência!`;
-      console.log(`[Notification Engine] Dispatching default WhatsApp completion alert to ${contactPhone}`);
-
-      try {
-        const res = await sendWhatsAppMessage(contactPhone, defaultText, card.tenant_id);
-        if (res?.success) dispatchedCount++;
-      } catch (err) {
-        console.error(`Failed sending default WhatsApp completion message:`, err.message);
+      
+      if (!isDuplicateDispatch(card.id, contactPhone, defaultText)) {
+        console.log(`[Notification Engine] Dispatching default WhatsApp completion alert to ${contactPhone}`);
+        try {
+          const res = await sendWhatsAppMessage(contactPhone, defaultText, card.tenant_id);
+          if (res?.success) dispatchedCount++;
+        } catch (err) {
+          console.error(`Failed sending default WhatsApp completion message:`, err.message);
+        }
       }
     } else {
       console.log(`No active notification rule for service ${card.service_id} on triggers [${triggerAliases.join(', ')}]`);
