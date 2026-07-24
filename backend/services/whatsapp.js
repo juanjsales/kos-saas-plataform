@@ -79,7 +79,7 @@ function scheduleSyncAuthFolderToSupabase(tenantId) {
     } catch (err) {
       console.error(`Error backing up auth folder for tenant ${tenantId} to Supabase:`, err.message);
     }
-  }, 10000);
+  }, 1000);
 
   syncDebounceTimers.set(tenantId, timer);
 }
@@ -272,7 +272,10 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
           if (isLoggedOut) {
             session.status = 'disconnected';
-            await clearAuthInfoFolder(activeTenantId);
+            console.log(`[WhatsApp Multi-Session] Notice: Session for tenant ${activeTenantId} marked disconnected. Preserving DB backup for cloud auto-recovery.`);
+            if (fs.existsSync(`baileys_auth_info_${activeTenantId}`)) {
+              try { fs.rmSync(`baileys_auth_info_${activeTenantId}`, { recursive: true, force: true }); } catch (e) {}
+            }
           } else {
             session.status = 'connecting';
             setTimeout(() => {
