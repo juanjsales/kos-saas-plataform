@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Clock, CheckCircle2, XCircle, ArrowRight, User, Phone, Tag, RefreshCw, Plus, CalendarPlus, X, FileText, ExternalLink, GripVertical, CheckSquare, Bot, AlertTriangle, Eye } from 'lucide-react';
+import { LayoutGrid, Clock, CheckCircle2, XCircle, ArrowRight, User, Phone, Tag, RefreshCw, Plus, CalendarPlus, X, FileText, ExternalLink, GripVertical, CheckSquare, Bot, AlertTriangle, Eye, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
 import { CompletionModal } from './CompletionModal';
 import { ServiceConfirmationModal } from './ServiceConfirmationModal';
@@ -15,6 +15,15 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
   const [runningRpaId, setRunningRpaId] = useState(null);
   const [draggedCard, setDraggedCard] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  const [expandedCardIds, setExpandedCardIds] = useState({});
+
+  const toggleCardExpanded = (cardId, e) => {
+    if (e) e.stopPropagation();
+    setExpandedCardIds(prev => ({
+      ...prev,
+      [cardId]: !prev[cardId]
+    }));
+  };
 
   // New Card Form state
   const [selectedServiceId, setSelectedServiceId] = useState('');
@@ -255,19 +264,32 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                 {columnCards.map((card) => {
                   const autoStatus = card.automation_status || 'idle';
                   const isRpaRunning = runningRpaId === card.id || autoStatus === 'running';
+                  const isExpanded = !!expandedCardIds[card.id];
 
                   return (
                     <div
                       key={card.id}
-                      className={`kanban-card glass-subcard draggable-card ${draggedCard?.id === card.id ? 'is-dragging' : ''}`}
+                      className={`kanban-card glass-subcard draggable-card ${isExpanded ? 'is-expanded' : ''} ${draggedCard?.id === card.id ? 'is-dragging' : ''}`}
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, card)}
+                      onClick={(e) => toggleCardExpanded(card.id, e)}
                     >
                       <div className="card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="service-tag">
                           <Tag size={12} /> {card.services?.title || 'Serviço'}
                         </span>
-                        <GripVertical size={16} className="drag-handle" style={{ cursor: 'grab', color: 'var(--text-muted)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className="btn-icon card-expand-toggle-btn"
+                            onClick={(e) => toggleCardExpanded(card.id, e)}
+                            title={isExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}
+                            style={{ padding: '2px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                          >
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                          <GripVertical size={16} className="drag-handle" style={{ cursor: 'grab', color: 'var(--text-muted)' }} />
+                        </div>
                       </div>
 
                       <div className="card-contact">
@@ -275,101 +297,110 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                         <div className="contact-phone"><Phone size={12} /> {card.contacts?.phone}</div>
                       </div>
 
-                      {card.collected_data && Object.keys(card.collected_data).length > 0 && (
-                        <div className="collected-data-box">
-                          {Object.entries(card.collected_data).map(([key, val]) => (
-                            <div key={key} className="data-row">
-                              <strong>{key}:</strong> {String(val)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* RPA Automation Status Badge & Execution Button */}
-                      <div className="rpa-badge-container glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Bot size={12} className="accent-icon" /> Automação RPA:
-                          </span>
-                          <span className={`status-tag status-${autoStatus}`} style={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>
-                            {autoStatus === 'idle' && '⚪ Inativo'}
-                            {autoStatus === 'running' && '🟡 Executando...'}
-                            {autoStatus === 'success' && '🟢 Sucesso'}
-                            {autoStatus === 'failed' && '🔴 Falha'}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            className="btn primary"
-                            disabled={isRpaRunning || !card.services?.external_url}
-                            onClick={() => handleExecuteRpa(card)}
-                            style={{ fontSize: '0.7rem', padding: '4px 8px', width: '100%', justifyContent: 'center' }}
-                            title={!card.services?.external_url ? 'Configure a external_url no ServiceBuilder' : 'Executar preenchimento no portal externo'}
-                          >
-                            {isRpaRunning ? <><RefreshCw size={12} className="spin" /> Executando...</> : <><Bot size={12} /> Executar RPA</>}
-                          </button>
-
-                          {card.automation_result && (
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={() => setRpaCardResult({ card, result: card.automation_result })}
-                              style={{ fontSize: '0.7rem', padding: '4px 6px' }}
-                              title="Ver logs e print de comprovação"
-                            >
-                              <Eye size={12} />
-                            </button>
-                          )}
-                        </div>
+                      {/* Small Hover & Collapsed Indicator Hint */}
+                      <div className="card-expand-hint">
+                        <span>{isExpanded ? '▲ Detalhes Abertos' : '🔍 Passe o mouse ou clique para ver mais'}</span>
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                       </div>
 
-                      {/* Attachment Metadata Box if card is completed */}
-                      {card.attachment_url && (
-                        <div className="attachment-box glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
-                          <div style={{ fontWeight: '600', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <FileText size={12} /> Comprovante Anexo
+                      {/* Collapsible Container (Expands on Hover or Click) */}
+                      <div className="card-collapsible-body" onClick={(e) => e.stopPropagation()}>
+                        {card.collected_data && Object.keys(card.collected_data).length > 0 && (
+                          <div className="collected-data-box">
+                            {Object.entries(card.collected_data).map(([key, val]) => (
+                              <div key={key} className="data-row">
+                                <strong>{key}:</strong> {String(val)}
+                              </div>
+                            ))}
                           </div>
-                          {card.attachment_metadata?.document_number && (
-                            <div>NF/Doc: <strong>{card.attachment_metadata.document_number}</strong></div>
-                          )}
-                          {card.attachment_metadata?.total_value && (
-                            <div>Valor: <strong>R$ {card.attachment_metadata.total_value}</strong></div>
-                          )}
-                          <a
-                            href={card.attachment_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: 'var(--primary-accent)', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '4px', textDecoration: 'none' }}
-                          >
-                            Ver documento <ExternalLink size={10} />
-                          </a>
+                        )}
+
+                        {/* RPA Automation Status Badge & Execution Button */}
+                        <div className="rpa-badge-container glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Bot size={12} className="accent-icon" /> Automação RPA:
+                            </span>
+                            <span className={`status-tag status-${autoStatus}`} style={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px' }}>
+                              {autoStatus === 'idle' && '⚪ Inativo'}
+                              {autoStatus === 'running' && '🟡 Executando...'}
+                              {autoStatus === 'success' && '🟢 Sucesso'}
+                              {autoStatus === 'failed' && '🔴 Falha'}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn primary"
+                              disabled={isRpaRunning || !card.services?.external_url}
+                              onClick={() => handleExecuteRpa(card)}
+                              style={{ fontSize: '0.7rem', padding: '4px 8px', width: '100%', justifyContent: 'center' }}
+                              title={!card.services?.external_url ? 'Configure a external_url no ServiceBuilder' : 'Executar preenchimento no portal externo'}
+                            >
+                              {isRpaRunning ? <><RefreshCw size={12} className="spin" /> Executando...</> : <><Bot size={12} /> Executar RPA</>}
+                            </button>
+
+                            {card.automation_result && (
+                              <button
+                                type="button"
+                                className="btn secondary"
+                                onClick={() => setRpaCardResult({ card, result: card.automation_result })}
+                                style={{ fontSize: '0.7rem', padding: '4px 6px' }}
+                                title="Ver logs e print de comprovação"
+                              >
+                                <Eye size={12} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      )}
 
-                      <div className="card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          style={{ fontSize: '0.75rem', padding: '4px 8px', justifyContent: 'center' }}
-                          onClick={() => setCardToConfirm(card)}
-                        >
-                          <CheckSquare size={12} /> Confirmação & WhatsApp
-                        </button>
+                        {/* Attachment Metadata Box if card is completed */}
+                        {card.attachment_url && (
+                          <div className="attachment-box glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <FileText size={12} /> Comprovante Anexo
+                            </div>
+                            {card.attachment_metadata?.document_number && (
+                              <div>NF/Doc: <strong>{card.attachment_metadata.document_number}</strong></div>
+                            )}
+                            {card.attachment_metadata?.total_value && (
+                              <div>Valor: <strong>R$ {card.attachment_metadata.total_value}</strong></div>
+                            )}
+                            <a
+                              href={card.attachment_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--primary-accent)', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '4px', textDecoration: 'none' }}
+                            >
+                              Ver documento <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        )}
 
-                        <div>
-                          <label className="action-label">Mover para:</label>
-                          <select
-                            className="input-control select-sm"
-                            value={card.status}
-                            onChange={(e) => handleUpdateStatus(card, e.target.value)}
+                        <div className="card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            style={{ fontSize: '0.75rem', padding: '4px 8px', justifyContent: 'center' }}
+                            onClick={() => setCardToConfirm(card)}
                           >
-                            <option value="created">Criados</option>
-                            <option value="in_progress">Em Andamento</option>
-                            <option value="completed">Concluídos</option>
-                            <option value="cancelled">Cancelados</option>
-                          </select>
+                            <CheckSquare size={12} /> Confirmação & WhatsApp
+                          </button>
+
+                          <div>
+                            <label className="action-label">Mover para:</label>
+                            <select
+                              className="input-control select-sm"
+                              value={card.status}
+                              onChange={(e) => handleUpdateStatus(card, e.target.value)}
+                            >
+                              <option value="created">Criados</option>
+                              <option value="in_progress">Em Andamento</option>
+                              <option value="completed">Concluídos</option>
+                              <option value="cancelled">Cancelados</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
