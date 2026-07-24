@@ -288,34 +288,66 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
         }
       });
 
+      // Handle synced chats list from Baileys
+      sock.ev.on('chats.upsert', async (chatsList) => {
+        for (const c of chatsList) {
+          if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
+          try {
+            await supabase.from('chats').upsert({
+              id: c.id,
+              tenant_id: activeTenantId,
+              contact_name: c.name || c.id.replace('@s.whatsapp.net', ''),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+          } catch (e) {}
+        }
+      });
+
       // Handle incoming & outgoing messages per tenant session
       sock.ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
-        if (type !== 'notify') return;
-
         for (const msg of newMessages) {
           const remoteJid = msg.key.remoteJid;
 
-          const myJid = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
           if (
             !remoteJid ||
             remoteJid.includes('@lid') ||
             remoteJid === 'status@broadcast' ||
             remoteJid.includes('@g.us') ||
             remoteJid.endsWith('@status.whatsapp.net') ||
-            remoteJid.endsWith('@newsletter') ||
-            (myJid && remoteJid.replace('@s.whatsapp.net', '') === myJid.replace('@s.whatsapp.net', ''))
+            remoteJid.endsWith('@newsletter')
           ) {
             continue;
           }
 
           const isFromMe = msg.key.fromMe;
           const senderPhone = remoteJid.replace('@s.whatsapp.net', '');
+
+          // Unpack ephemeral / viewOnce wrapper if present
+          const m = msg.message?.ephemeralMessage?.message ||
+                    msg.message?.viewOnceMessage?.message ||
+                    msg.message?.viewOnceMessageV2?.message ||
+                    msg.message;
+
+          if (!m) continue;
+
           const content =
-            msg.message?.conversation ||
-            msg.message?.extendedTextMessage?.text ||
-            '[Media/Outra Mensagem]';
+            m.conversation ||
+            m.extendedTextMessage?.text ||
+            m.imageMessage?.caption ||
+            m.videoMessage?.caption ||
+            m.documentMessage?.caption ||
+            (m.imageMessage ? '📷 [Imagem]' : null) ||
+            (m.videoMessage ? '🎥 [Vídeo]' : null) ||
+            (m.audioMessage ? '🎵 [Áudio]' : null) ||
+            (m.documentMessage ? '📄 [Documento]' : null) ||
+            (m.stickerMessage ? '🎨 [Sticker]' : null) ||
+            (m.contactMessage ? '👤 [Contato]' : null) ||
+            (m.locationMessage ? '📍 [Localização]' : null) ||
+            '[Mensagem no WhatsApp]';
 
           const contactName = msg.pushName || senderPhone;
+          const timestampMs = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now();
+          const timestampIso = new Date(timestampMs).toISOString();
 
           try {
             const { processWhatsAppConsentKeywords } = await import('./whatsappOptOutService.js');
@@ -327,7 +359,7 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
                 id: remoteJid,
                 tenant_id: activeTenantId,
                 contact_name: contactName,
-                updated_at: new Date().toISOString()
+                updated_at: timestampIso
               }, { onConflict: 'id' });
 
             await supabase
@@ -344,7 +376,7 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
                 chat_id: remoteJid,
                 sender_phone: isFromMe ? 'System/Agent' : senderPhone,
                 content: content,
-                timestamp: new Date(msg.messageTimestamp * 1000).toISOString()
+                timestamp: timestampIso
               });
 
           } catch (err) {

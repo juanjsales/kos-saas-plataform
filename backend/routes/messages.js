@@ -27,9 +27,23 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    // 2. Log message to Supabase
+    // 2. Log chat, contact & message to Supabase
     const targetChatId = chatId || (recipientPhone.includes('@s.whatsapp.net') ? recipientPhone : `${recipientPhone}@s.whatsapp.net`);
-    
+    const cleanPhone = recipientPhone.replace(/\D/g, '');
+
+    await supabase.from('chats').upsert({
+      id: targetChatId,
+      tenant_id: targetTenant || '00000000-0000-0000-0000-000000000001',
+      contact_name: cleanPhone,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    await supabase.from('contacts').upsert({
+      tenant_id: targetTenant || '00000000-0000-0000-0000-000000000001',
+      name: cleanPhone,
+      phone: cleanPhone
+    }, { onConflict: 'tenant_id,phone' });
+
     await supabase.from('messages').insert({
       chat_id: targetChatId,
       sender_phone: 'System/Agent',
