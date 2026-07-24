@@ -238,7 +238,12 @@ export async function executeExternalAutomation(cardId) {
         updated_at: new Date().toISOString()
       })
       .eq('id', cardId)
-      .catch(() => {});
+      .catch(async (dbErr) => {
+        console.error('[RPA Critical DB Retry Error]', dbErr);
+        // Fallback retry de emergência para desmarcar 'running'
+        await new Promise(r => setTimeout(r, 1500));
+        await supabase.from('cards').update({ automation_status: 'failed' }).eq('id', cardId).catch(() => {});
+      });
 
     return { success: false, ...resultPayload };
 

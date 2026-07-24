@@ -77,13 +77,16 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
     }
   }, [tenantId]);
 
-  // Realtime subscription on cards table
+  // Realtime subscription on cards table with strict tenant filter
   useEffect(() => {
+    if (!tenantId) return;
+
+    const channelName = `kanban-cards-${tenantId}`;
     const channel = supabase
-      .channel('kanban-cards-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'cards' },
+        { event: '*', schema: 'public', table: 'cards', filter: `tenant_id=eq.${tenantId}` },
         () => {
           fetchCards();
         }

@@ -17,19 +17,7 @@ export async function getChats(req, res) {
 
     if (error) throw error;
 
-    // Fallback: If no chats found for specific tenant, return all chats
-    if (!chats || chats.length === 0) {
-      const { data: allChats } = await supabase
-        .from('chats')
-        .select('*')
-        .not('id', 'like', '%@lid%')
-        .not('id', 'like', '%status@broadcast%')
-        .not('id', 'like', '%@g.us%')
-        .order('updated_at', { ascending: false });
-      chats = allChats || [];
-    }
-
-    return res.json(chats);
+    return res.json(chats || []);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

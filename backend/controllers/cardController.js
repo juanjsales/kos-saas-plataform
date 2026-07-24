@@ -119,20 +119,7 @@ export async function getCards(req, res) {
 
     if (error) throw error;
 
-    // Fallback: If no cards found for specific tenant, return all cards
-    if (!cards || cards.length === 0) {
-      const { data: allCards } = await supabase
-        .from('cards')
-        .select(`
-          *,
-          services ( title, description, confirmation_template, completion_type ),
-          contacts ( name, phone )
-        `)
-        .order('created_at', { ascending: false });
-      cards = allCards || [];
-    }
-
-    return res.json(cards);
+    return res.json(cards || []);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -211,6 +198,13 @@ export async function analyzeCardAttachment(req, res) {
     }
 
     const file = req.file;
+
+    // Strict MIME-Type validation to prevent RCE / malicious script uploads
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return res.status(400).json({ error: 'Tipo de arquivo não permitido. Envie apenas imagens (JPG, PNG, WEBP), PDF ou arquivo TXT.' });
+    }
+
     const tenantId = req.body.tenant_id || '00000000-0000-0000-0000-000000000001';
     const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
     const filePath = `${tenantId}/${fileName}`;

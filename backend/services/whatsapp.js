@@ -408,18 +408,7 @@ export async function sendWhatsAppMessage(recipientPhone, content, tenantId = '0
   // 1. Check requested tenant session
   activeSock = await waitForSocket(realTenantId);
 
-  // 2. Check all active sessions in registry for any connected socket
-  if (!activeSock?.user) {
-    for (const [id, s] of tenantSessions.entries()) {
-      const sock = await waitForSocket(id);
-      if (sock?.user || s.status === 'connected') {
-        activeSock = sock;
-        break;
-      }
-    }
-  }
-
-  // 3. Attempt fast auto-restore if missing from memory
+  // 2. Attempt fast auto-restore if missing from memory
   if (!activeSock?.user) {
     try {
       const sock = await initWhatsAppEngine(realTenantId);
@@ -429,17 +418,7 @@ export async function sendWhatsAppMessage(recipientPhone, content, tenantId = '0
     } catch (e) {}
   }
 
-  // 4. Final check across all sessions
-  if (!activeSock?.user) {
-    for (const [id, s] of tenantSessions.entries()) {
-      if (s.sock?.user || s.status === 'connected') {
-        activeSock = s.sock;
-        break;
-      }
-    }
-  }
-
-  if (!activeSock) {
+  if (!activeSock || !activeSock.user) {
     console.warn(`[WhatsApp Dispatcher] Notice: Cannot send message to ${recipientPhone}. No active WhatsApp session connected for tenant ${tenantId}.`);
     return { success: false, reason: 'whatsapp_not_connected' };
   }
@@ -476,6 +455,9 @@ export async function logoutWhatsAppEngine(tenantId = '00000000-0000-0000-0000-0
       if (session.sock) {
         console.log(`[WhatsApp Multi-Session] Logging out session for tenant ${id}...`);
         await session.sock.logout().catch(() => {});
+        session.sock.ev.removeAllListeners('connection.update');
+        session.sock.ev.removeAllListeners('messages.upsert');
+        session.sock.ev.removeAllListeners('creds.update');
         try { session.sock.end(new Error('Manual Tenant Disconnect')); } catch(e) {}
         session.sock = null;
       }

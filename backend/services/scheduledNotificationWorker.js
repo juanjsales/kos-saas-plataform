@@ -48,6 +48,19 @@ export async function processScheduledMessagesQueue() {
     console.log(`[Scheduled Worker] Processing ${queueItems.length} pending scheduled messages...`);
 
     for (const item of queueItems) {
+      // Atomic Lock: Transição imediata de status para 'processing' para evitar corrida entre workers
+      const { data: lockedItem, error: lockErr } = await supabase
+        .from('scheduled_messages_queue')
+        .update({ status: 'processing' })
+        .eq('id', item.id)
+        .eq('status', 'pending')
+        .select()
+        .maybeSingle();
+
+      if (!lockedItem || lockErr) {
+        continue; // Ignorar se outro worker já assumiu o processamento do item
+      }
+
       const card = item.cards;
       const payload = item.payload || {};
       const contactPhone = card?.contacts?.phone || payload.contact_phone;

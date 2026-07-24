@@ -78,8 +78,11 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
 
   // 4. Supabase Realtime Subscription
   useEffect(() => {
+    if (!tenantId) return;
+
+    const channelName = `live-whatsapp-${tenantId}`;
     const channel = supabase
-      .channel('live-whatsapp-central')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -93,7 +96,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats' },
+        { event: '*', schema: 'public', table: 'chats', filter: `tenant_id=eq.${tenantId}` },
         () => {
           fetchChats();
         }
@@ -103,7 +106,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedChat]);
+  }, [tenantId, selectedChat]);
 
   const handleSelectChat = (chat) => {
     setSelectedChat(chat);

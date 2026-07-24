@@ -184,18 +184,13 @@ ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  CREATE POLICY "Allow all access to tenants" ON tenants FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to users" ON users FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to user_preferences" ON user_preferences FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to services" ON services FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to custom_fields" ON custom_fields FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to contacts" ON contacts FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to cards" ON cards FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to chats" ON chats FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to messages" ON messages FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to workflow_rules" ON workflow_rules FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to scheduled_messages_queue" ON scheduled_messages_queue FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Allow all access to notification_rules" ON notification_rules FOR ALL USING (true) WITH CHECK (true);
+  -- Strict RLS Policies for Tenant Isolation
+  CREATE POLICY "Tenant isolation for services" ON services FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
+  CREATE POLICY "Tenant isolation for contacts" ON contacts FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
+  CREATE POLICY "Tenant isolation for cards" ON cards FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
+  CREATE POLICY "Tenant isolation for chats" ON chats FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
+  CREATE POLICY "Tenant isolation for workflow_rules" ON workflow_rules FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
+  CREATE POLICY "Tenant isolation for scheduled_messages_queue" ON scheduled_messages_queue FOR ALL USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid OR auth.jwt() IS NULL);
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
