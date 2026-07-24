@@ -61,6 +61,14 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
   const rawTemplate = targetService?.confirmation_template || 
     'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!';
 
+  const parseFieldOptions = (opts) => {
+    if (!opts) return [];
+    if (Array.isArray(opts)) return opts.map(o => String(o).trim()).filter(Boolean);
+    if (typeof opts === 'string') return opts.split(',').map(o => o.trim()).filter(Boolean);
+    if (typeof opts === 'object') return Object.values(opts).map(o => String(o).trim()).filter(Boolean);
+    return [String(opts).trim()];
+  };
+
   // Safety Lock check: verify all required fields are filled
   const isFormValid = customFields.every(field => {
     if (!field.is_required) return true;
@@ -312,15 +320,15 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                           onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
                         >
                           <option value="">-- Escolha uma opção --</option>
-                          {(field.options ? field.options.split(',') : []).map((opt, i) => (
-                            <option key={i} value={opt.trim()}>{opt.trim()}</option>
+                          {parseFieldOptions(field.options).map((opt, i) => (
+                            <option key={i} value={opt}>{opt}</option>
                           ))}
                         </select>
                       ) : field.field_type === 'checkbox' ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' }}>
-                          {(field.options ? field.options.split(',') : ['Sim']).map((opt, i) => {
-                            const cleanOpt = opt.trim();
-                            const currentVal = collectedData[field.field_label] || '';
+                          {(parseFieldOptions(field.options).length > 0 ? parseFieldOptions(field.options) : ['Sim']).map((opt, i) => {
+                            const cleanOpt = String(opt).trim();
+                            const currentVal = String(collectedData[field.field_label] || '');
                             const isChecked = currentVal.includes(cleanOpt);
 
                             const handleToggle = () => {
