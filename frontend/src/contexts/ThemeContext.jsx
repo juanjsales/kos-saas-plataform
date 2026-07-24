@@ -95,8 +95,8 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
     const root = document.documentElement;
     root.style.setProperty('--primary-accent', accentColor);
     root.style.setProperty('--brand-primary', tenantBrandColor);
-    root.style.setProperty('--gradient-rgb-1', hexToRgba(rgbColor1, 0.16));
-    root.style.setProperty('--gradient-rgb-2', hexToRgba(rgbColor2, 0.16));
+    root.style.setProperty('--gradient-rgb-1', hexToRgba(rgbColor1, 0.35));
+    root.style.setProperty('--gradient-rgb-2', hexToRgba(rgbColor2, 0.35));
 
     if (themeMode === 'light') {
       document.body.classList.add('light-theme');
