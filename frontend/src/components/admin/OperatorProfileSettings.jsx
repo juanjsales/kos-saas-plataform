@@ -4,7 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../config/supabaseClient';
 
 export function OperatorProfileSettings() {
-  const { themeMode, accentColor, kanbanDensity, updatePreferences, tenantName } = useTheme();
+  const { themeMode, accentColor, rgbColor1, rgbColor2, kanbanDensity, updatePreferences, tenantName } = useTheme();
 
   const [newPassword, setNewPassword] = useState('');
   const [submittingPassword, setSubmittingPassword] = useState(false);
@@ -32,8 +32,20 @@ export function OperatorProfileSettings() {
     setPasswordSuccess(false);
 
     try {
+      // Primary: Supabase Auth updateUser
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase auth updateUser failed, attempting API fallback...', error.message);
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
+        const res = await fetch(`${apiUrl}/api/user/password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPassword })
+        });
+        if (!res.ok) {
+          throw new Error(error.message || 'Erro ao alterar senha.');
+        }
+      }
 
       setPasswordSuccess(true);
       setNewPassword('');
