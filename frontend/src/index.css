@@ -82,18 +82,15 @@
 
 body {
   font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #0f172a;
+  background-color: var(--bg-main);
   background-image: 
-    radial-gradient(at 0% 0%, var(--gradient-rgb-1, rgba(99, 102, 241, 0.35)) 0px, transparent 55%),
-    radial-gradient(at 100% 100%, var(--gradient-rgb-2, rgba(16, 185, 129, 0.35)) 0px, transparent 55%),
-    radial-gradient(at 50% 50%, var(--gradient-rgb-1, rgba(99, 102, 241, 0.15)) 0px, transparent 75%),
-    linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  background-attachment: fixed;
+    radial-gradient(at 5% 5%, var(--gradient-rgb-1, rgba(99, 102, 241, 0.08)) 0px, transparent 40%),
+    radial-gradient(at 95% 95%, var(--gradient-rgb-2, rgba(16, 185, 129, 0.08)) 0px, transparent 40%);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
-  transition: background 0.5s ease;
+  transition: background 0.4s ease;
 }
 
 /* Friendly Clean Cards */
@@ -241,9 +238,9 @@ body {
 }
 
 .tab-btn.active {
-  background: var(--secondary-gradient);
+  background: var(--user-rgb-gradient, linear-gradient(135deg, #6366f1 0%, #10b981 100%));
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
 }
 
 /* Kanban Board Styling */
@@ -955,14 +952,14 @@ body {
 }
 
 .btn.primary {
-  background: var(--secondary-gradient);
+  background: var(--user-rgb-gradient, linear-gradient(135deg, #6366f1 0%, #10b981 100%));
   color: #ffffff;
 }
 
 .btn.primary:hover {
   opacity: 0.95;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
 }
 
 .btn.secondary {

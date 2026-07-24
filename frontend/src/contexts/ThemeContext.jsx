@@ -93,10 +93,15 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
   // Apply CSS Custom Variables dynamically on HTML document root
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--primary-accent', accentColor);
+    const color1 = rgbColor1 || '#6366f1';
+    const color2 = rgbColor2 || '#10b981';
+    root.style.setProperty('--primary-accent', accentColor || color1);
     root.style.setProperty('--brand-primary', tenantBrandColor);
-    root.style.setProperty('--gradient-rgb-1', hexToRgba(rgbColor1, 0.35));
-    root.style.setProperty('--gradient-rgb-2', hexToRgba(rgbColor2, 0.35));
+    root.style.setProperty('--rgb-color-1', color1);
+    root.style.setProperty('--rgb-color-2', color2);
+    root.style.setProperty('--user-rgb-gradient', `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`);
+    root.style.setProperty('--gradient-rgb-1', hexToRgba(color1, 0.12));
+    root.style.setProperty('--gradient-rgb-2', hexToRgba(color2, 0.12));
 
     if (themeMode === 'light') {
       document.body.classList.add('light-theme');
