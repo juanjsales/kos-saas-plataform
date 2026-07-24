@@ -5,7 +5,7 @@ export async function getTeamMembers(req, res) {
   try {
     const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    let { data: users, error } = await supabase
+    const { data: users, error } = await supabase
       .from('users')
       .select('*')
       .eq('tenant_id', activeTenantId)
@@ -13,15 +13,7 @@ export async function getTeamMembers(req, res) {
 
     if (error) {
       console.error('Error querying team members table:', error.message);
-    }
-
-    // Fallback: If no team members found for specific tenant, return all users in public.users
-    if (!users || users.length === 0) {
-      const { data: allUsers } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-      users = allUsers || [];
+      throw error;
     }
 
     return res.json(users || []);

@@ -131,7 +131,7 @@ export async function getServices(req, res) {
   try {
     const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    let { data: services, error } = await supabase
+    const { data: services, error } = await supabase
       .from('services')
       .select(`
         *,
@@ -142,19 +142,7 @@ export async function getServices(req, res) {
 
     if (error) throw error;
 
-    // Fallback: If no services found for specific tenant, return all services
-    if (!services || services.length === 0) {
-      const { data: allServices } = await supabase
-        .from('services')
-        .select(`
-          *,
-          custom_fields (*)
-        `)
-        .order('created_at', { ascending: false });
-      services = allServices || [];
-    }
-
-    return res.json(services);
+    return res.json(services || []);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

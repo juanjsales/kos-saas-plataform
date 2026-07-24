@@ -119,30 +119,10 @@ async function restoreAuthFolderFromSupabase(tenantId) {
  * Ensures a valid tenant exists in public.tenants table
  */
 export async function getOrEnsureValidTenant(requestedTenantId) {
-  try {
-    if (requestedTenantId && requestedTenantId !== '00000000-0000-0000-0000-000000000001') {
-      const { data: existing } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('id', requestedTenantId)
-        .maybeSingle();
-
-      if (existing) return existing.id;
-    }
-
-    // Return the first real active company from Supabase DB
-    const { data: anyTenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .limit(1)
-      .maybeSingle();
-
-    if (anyTenant?.id) return anyTenant.id;
-
-    return requestedTenantId;
-  } catch (err) {
+  if (requestedTenantId) {
     return requestedTenantId;
   }
+  return '00000000-0000-0000-0000-000000000001';
 }
 
 /**

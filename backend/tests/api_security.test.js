@@ -45,12 +45,19 @@ describe('🛡️ Backend Security, Multi-Tenant Isolation & Rate Limiting Suite
     expect(resA.status).toBe(200);
     expect(Array.isArray(resA.body)).toBe(true);
 
-    // Ensure all returned items match tenantA
     if (resA.body.length > 0) {
       resA.body.forEach((card) => {
         expect(card.tenant_id).toBe(tenantA);
       });
     }
+
+    // Explicit test for services isolation
+    const tenantRandom = '11111111-1111-1111-1111-111111111111';
+    const resServices = await request(app).get(`/api/services?tenant_id=${tenantRandom}`);
+    expect(resServices.status).toBe(200);
+    expect(Array.isArray(resServices.body)).toBe(true);
+    // Must strictly return 0 items for unknown/empty tenant, never leak other tenants' services
+    expect(resServices.body.length).toBe(0);
   });
 
   test('3. Extreme String & Payload Sanitization: Handles 5,000 char strings with special chars safely', async () => {
