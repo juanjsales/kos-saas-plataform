@@ -34,10 +34,10 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const columns = [
-    { status: 'created', title: '1. Pedidos Chegando', icon: Clock, color: 'blue' },
-    { status: 'in_progress', title: '2. Em Atendimento', icon: ArrowRight, color: 'amber' },
-    { status: 'completed', title: '3. Finalizados / Pronto', icon: CheckCircle2, color: 'emerald' },
-    { status: 'cancelled', title: '4. Cancelados', icon: XCircle, color: 'rose' }
+    { status: 'created', title: '📌 1. Novos Pedidos', icon: Clock, color: 'blue' },
+    { status: 'in_progress', title: '⏳ 2. Em Andamento', icon: ArrowRight, color: 'amber' },
+    { status: 'completed', title: '✅ 3. Concluídos', icon: CheckCircle2, color: 'emerald' },
+    { status: 'cancelled', title: '❌ 4. Cancelados', icon: XCircle, color: 'rose' }
   ];
 
   const fetchCards = async () => {
@@ -221,17 +221,17 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
       <div className="section-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
-            <h2><LayoutGrid size={24} className="accent-icon" /> Quadro Kanban de Atendimentos & Automação RPA</h2>
-            <p>Gerencie atendimentos, dispare notificações e preencha formulários externos via robô RPA com Puppeteer!</p>
+            <h2><LayoutGrid size={24} className="accent-icon" /> 📌 Quadro de Pedidos dos Clientes</h2>
+            <p>Acompanhe e confirme os pedidos dos seus clientes em colunas organizadas.</p>
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button className="btn secondary" onClick={fetchCards} disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'spin' : ''} /> Atualizar
+              <RefreshCw size={16} className={loading ? 'spin' : ''} /> Atualizar Lista
             </button>
 
             <button className="btn primary" onClick={() => setShowNewCardModal(true)}>
-              <Plus size={18} /> Novo Cartão / Atendimento
+              <Plus size={18} /> ➕ Abrir Novo Pedido
             </button>
           </div>
         </div>
