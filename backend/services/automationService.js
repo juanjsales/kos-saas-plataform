@@ -89,40 +89,98 @@ export async function executeExternalAutomation(cardId) {
     addLog(`Navigating to external portal: ${externalUrl}`);
     await page.goto(externalUrl, { waitUntil: 'networkidle2' });
 
-    // 5. Fill fields based on "De/Para" CSS selector mappings with waitForSelector
-    for (const map of mappings) {
-      const { css_selector, source_field } = map;
-      if (!css_selector || !source_field) continue;
+    // 5. Fill fields & execute dynamic steps (Type, Scroll, Click, Wait, Select)
+    for (const step of mappings) {
+      const { css_selector, source_field, action_type = 'type', scroll_amount = 300, wait_ms = 2000 } = step;
+      
+      // Determine value if source_field is provided
+      let fieldValue = '';
+      if (source_field) {
+        fieldValue = dataMap[source_field] !== undefined && dataMap[source_field] !== null
+          ? String(dataMap[source_field])
+          : source_field;
+      }
 
-      const fieldValue = dataMap[source_field] !== undefined && dataMap[source_field] !== null
-        ? String(dataMap[source_field])
-        : '';
+      // ACTION 1: Scroll Page (Down / Up / Into View)
+      if (action_type === 'scroll') {
+        const scrollDist = parseInt(scroll_amount) || 300;
+        addLog(`Scrolling page (Amount: ${scrollDist}px)...`);
+        if (css_selector) {
+          await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, css_selector).catch(() => {});
+        } else {
+          await page.evaluate((dist) => window.scrollBy(0, dist), scrollDist);
+        }
+        await page.evaluate(() => new Promise(r => setTimeout(r, 600)));
+        continue;
+      }
 
-      addLog(`Waiting for selector "${css_selector}" for field "${source_field}"...`);
-      await page.waitForSelector(css_selector, { visible: true, timeout: 30000 });
+      // ACTION 2: Wait for Element or Delay
+      if (action_type === 'wait') {
+        const waitTime = parseInt(wait_ms) || 2000;
+        if (css_selector) {
+          addLog(`Waiting for element "${css_selector}" to appear...`);
+          await page.waitForSelector(css_selector, { visible: true, timeout: 15000 }).catch(() => {});
+        } else {
+          addLog(`Waiting ${waitTime}ms for page to update...`);
+          await page.evaluate((ms) => new Promise(r => setTimeout(r, ms)), waitTime);
+        }
+        continue;
+      }
 
-      addLog(`Typing value into "${css_selector}" (Value: ${fieldValue || '[Vazio]'})`);
-      await page.focus(css_selector);
-      // Clear existing input text if any
-      await page.evaluate((sel) => {
-        const input = document.querySelector(sel);
-        if (input) input.value = '';
-      }, css_selector);
+      // ACTION 3: Click Button / Link / Tab
+      if (action_type === 'click') {
+        if (!css_selector) continue;
+        addLog(`Waiting for button "${css_selector}" to click...`);
+        await page.waitForSelector(css_selector, { visible: true, timeout: 15000 });
+        addLog(`Clicking button "${css_selector}"...`);
+        await page.click(css_selector);
+        await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
+        continue;
+      }
 
-      if (fieldValue) {
-        await page.type(css_selector, fieldValue, { delay: 50 });
+      // ACTION 4: Select Dropdown Option
+      if (action_type === 'select') {
+        if (!css_selector) continue;
+        addLog(`Selecting option "${fieldValue}" in dropdown "${css_selector}"...`);
+        await page.waitForSelector(css_selector, { visible: true, timeout: 15000 });
+        await page.select(css_selector, fieldValue).catch(async () => {
+          // Fallback typing value
+          await page.type(css_selector, fieldValue);
+        });
+        continue;
+      }
+
+      // ACTION 5: Type Text (Default)
+      if (css_selector) {
+        addLog(`Waiting for selector "${css_selector}" for field "${source_field}"...`);
+        await page.waitForSelector(css_selector, { visible: true, timeout: 20000 });
+
+        addLog(`Typing value into "${css_selector}" (Value: ${fieldValue || '[Vazio]'})`);
+        await page.focus(css_selector);
+        // Clear existing text if any
+        await page.evaluate((sel) => {
+          const input = document.querySelector(sel);
+          if (input) input.value = '';
+        }, css_selector);
+
+        if (fieldValue) {
+          await page.type(css_selector, fieldValue, { delay: 40 });
+        }
       }
     }
 
     // 6. Submit button click if configured
     const submitSelector = automationConfig?.submit_selector;
     if (submitSelector) {
-      addLog(`Waiting for submit button "${submitSelector}"...`);
-      await page.waitForSelector(submitSelector, { visible: true, timeout: 30000 });
-      addLog(`Clicking submit button "${submitSelector}"...`);
+      addLog(`Waiting for final submit button "${submitSelector}"...`);
+      await page.waitForSelector(submitSelector, { visible: true, timeout: 20000 });
+      addLog(`Clicking final submit button "${submitSelector}"...`);
       await Promise.all([
         page.click(submitSelector),
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {})
       ]);
     }
 

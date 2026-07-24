@@ -538,28 +538,58 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
             <div style={{ marginTop: '16px' }}>
               <label className="form-label" style={{ fontWeight: '600' }}>
-                Quais dados o robô deve digitar no outro site:
+                Sequência de Ações do Robô no Site (Digitar, Rolar, Clicar, Aguardar Vagas):
               </label>
 
               {automationMappings.map((mapRow, idx) => (
-                <div key={idx} className="field-row glass-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 40px', gap: '12px', marginBottom: '8px' }}>
+                <div key={idx} className="field-row glass-row" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 40px', gap: '12px', marginBottom: '8px', alignItems: 'center' }}>
+                  <select
+                    className="input-control select-control"
+                    value={mapRow.action_type || 'type'}
+                    onChange={(e) => handleMappingChange(idx, 'action_type', e.target.value)}
+                  >
+                    <option value="type">✏️ Digitar Dados no Campo</option>
+                    <option value="click">🖱️ Clicar em Botão / Link</option>
+                    <option value="scroll">📜 Rolar a Página (Para Baixo/Cima)</option>
+                    <option value="wait">⏰ Aguardar Carregar Vagas / Elemento</option>
+                    <option value="select">📋 Escolher Opção na Lista (Dropdown)</option>
+                  </select>
+
                   <input
                     type="text"
                     className="input-control"
-                    placeholder="Campo no outro site (Ex: #input-cpf)"
+                    placeholder={mapRow.action_type === 'scroll' ? 'Distância em pixels (Ex: 400)' : 'Campo no site (Ex: #input-cpf)'}
                     value={mapRow.css_selector}
                     onChange={(e) => handleMappingChange(idx, 'css_selector', e.target.value)}
                   />
 
-                  <select
-                    className="input-control select-control"
-                    value={mapRow.source_field}
-                    onChange={(e) => handleMappingChange(idx, 'source_field', e.target.value)}
-                  >
-                    {availableSourceFields.map(sf => (
-                      <option key={sf} value={sf}>{sf}</option>
-                    ))}
-                  </select>
+                  {mapRow.action_type === 'scroll' ? (
+                    <input
+                      type="number"
+                      className="input-control"
+                      placeholder="Pixels (Ex: 400)"
+                      value={mapRow.scroll_amount || 300}
+                      onChange={(e) => handleMappingChange(idx, 'scroll_amount', e.target.value)}
+                    />
+                  ) : mapRow.action_type === 'wait' ? (
+                    <input
+                      type="number"
+                      className="input-control"
+                      placeholder="Tempo em ms (Ex: 2000)"
+                      value={mapRow.wait_ms || 2000}
+                      onChange={(e) => handleMappingChange(idx, 'wait_ms', e.target.value)}
+                    />
+                  ) : (
+                    <select
+                      className="input-control select-control"
+                      value={mapRow.source_field}
+                      onChange={(e) => handleMappingChange(idx, 'source_field', e.target.value)}
+                    >
+                      {availableSourceFields.map(sf => (
+                        <option key={sf} value={sf}>{sf}</option>
+                      ))}
+                    </select>
+                  )}
 
                   <button type="button" className="btn-icon danger" onClick={() => removeMappingRow(idx)}>
                     <Trash2 size={18} />
@@ -568,7 +598,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               ))}
 
               <button type="button" className="btn secondary" onClick={addMappingRow} style={{ marginTop: '8px', fontSize: '0.8rem' }}>
-                <Plus size={14} /> Adicionar Novo Campo para Digitação
+                <Plus size={14} /> Adicionar Nova Ação ao Robô
               </button>
             </div>
           </div>

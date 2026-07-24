@@ -359,10 +359,16 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                         {card.attachment_url && (
                           <div className="attachment-box glass-subcard" style={{ marginTop: '8px', padding: '8px', fontSize: '0.75rem' }}>
                             <div style={{ fontWeight: '600', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <FileText size={12} /> Comprovante Anexo
+                              <FileText size={12} /> Comprovante de Agendamento Anexo
                             </div>
-                            {card.attachment_metadata?.document_number && (
-                              <div>NF/Doc: <strong>{card.attachment_metadata.document_number}</strong></div>
+                            {(card.attachment_metadata?.protocol_number || card.attachment_metadata?.document_number) && (
+                              <div>📑 Protocolo: <strong>{card.attachment_metadata.protocol_number || card.attachment_metadata.document_number}</strong></div>
+                            )}
+                            {card.attachment_metadata?.appointment_location && (
+                              <div>📍 Local: <strong>{card.attachment_metadata.appointment_location}</strong></div>
+                            )}
+                            {(card.attachment_metadata?.appointment_date || card.attachment_metadata?.appointment_time) && (
+                              <div>📅 Data: <strong>{card.attachment_metadata.appointment_date || card.attachment_metadata.document_date} {card.attachment_metadata.appointment_time ? `às ${card.attachment_metadata.appointment_time}` : ''}</strong></div>
                             )}
                             {card.attachment_metadata?.total_value && (
                               <div>Valor: <strong>R$ {card.attachment_metadata.total_value}</strong></div>
@@ -373,7 +379,7 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                               rel="noreferrer"
                               style={{ color: 'var(--primary-accent)', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '4px', textDecoration: 'none' }}
                             >
-                              Ver documento <ExternalLink size={10} />
+                              Ver documento de agendamento <ExternalLink size={10} />
                             </a>
                           </div>
                         )}
