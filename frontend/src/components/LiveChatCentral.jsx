@@ -136,7 +136,8 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
         body: JSON.stringify({
           recipientPhone,
           content: messageContent,
-          chatId: selectedChat.id
+          chatId: selectedChat.id,
+          tenant_id: tenantId
         })
       });
 

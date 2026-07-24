@@ -10,14 +10,22 @@ const router = Router();
  */
 router.post('/send', async (req, res) => {
   try {
-    const { recipientPhone, content, chatId } = req.body;
+    const { recipientPhone, content, chatId, tenant_id } = req.body;
+    const targetTenant = tenant_id || req.headers['x-tenant-id'] || req.query.tenant_id;
 
     if (!recipientPhone || !content) {
       return res.status(400).json({ error: 'recipientPhone and content are required' });
     }
 
     // 1. Dispatch outbound WhatsApp message
-    const result = await sendWhatsAppMessage(recipientPhone, content);
+    const result = await sendWhatsAppMessage(recipientPhone, content, targetTenant);
+
+    if (result && result.success === false) {
+      return res.status(400).json({
+        success: false,
+        error: 'Sessão do WhatsApp desconectada. Clique no botão "Conectar WhatsApp" no topo do painel para escanear o QR Code.'
+      });
+    }
 
     // 2. Log message to Supabase
     const targetChatId = chatId || (recipientPhone.includes('@s.whatsapp.net') ? recipientPhone : `${recipientPhone}@s.whatsapp.net`);
@@ -29,7 +37,7 @@ router.post('/send', async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    return res.status(200).json({ success: true, messageId: result?.key?.id, result });
+    return res.status(200).json({ success: true, messageId: result?.result?.key?.id || result?.key?.id, result });
   } catch (err) {
     console.error('Failed to send WhatsApp message:', err);
     return res.status(500).json({ error: err.message });

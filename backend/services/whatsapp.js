@@ -389,38 +389,50 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
  */
 export async function sendWhatsAppMessage(recipientPhone, content, tenantId = '00000000-0000-0000-0000-000000000001') {
   let activeSock = null;
+  const realTenantId = await getOrEnsureValidTenant(tenantId);
+
+  // Helper to wait up to 5 seconds for a connecting socket to open
+  const waitForSocket = async (targetId) => {
+    const s = getTenantSession(targetId);
+    if (s.sock?.user) return s.sock;
+    if (s.status === 'connected' && s.sock) return s.sock;
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 250));
+      if (s.sock?.user) return s.sock;
+      if (s.status === 'connected' && s.sock) return s.sock;
+    }
+    return s.sock || null;
+  };
 
   // 1. Check requested tenant session
-  const requestedSession = getTenantSession(tenantId);
-  if (requestedSession?.sock?.user) {
-    activeSock = requestedSession.sock;
-  }
+  activeSock = await waitForSocket(realTenantId);
 
   // 2. Check all active sessions in registry for any connected socket
-  if (!activeSock) {
+  if (!activeSock?.user) {
     for (const [id, s] of tenantSessions.entries()) {
-      if (s.sock?.user) {
-        activeSock = s.sock;
+      const sock = await waitForSocket(id);
+      if (sock?.user || s.status === 'connected') {
+        activeSock = sock;
         break;
       }
     }
   }
 
   // 3. Attempt fast auto-restore if missing from memory
-  if (!activeSock) {
+  if (!activeSock?.user) {
     try {
-      const realTenantId = await getOrEnsureValidTenant(tenantId);
       const sock = await initWhatsAppEngine(realTenantId);
-      if (sock?.user) {
-        activeSock = sock;
+      if (sock) {
+        activeSock = await waitForSocket(realTenantId);
       }
     } catch (e) {}
   }
 
   // 4. Final check across all sessions
-  if (!activeSock) {
+  if (!activeSock?.user) {
     for (const [id, s] of tenantSessions.entries()) {
-      if (s.sock?.user) {
+      if (s.sock?.user || s.status === 'connected') {
         activeSock = s.sock;
         break;
       }
