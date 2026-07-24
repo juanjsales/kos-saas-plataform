@@ -266,6 +266,14 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                   const isRpaRunning = runningRpaId === card.id || autoStatus === 'running';
                   const isExpanded = !!expandedCardIds[card.id];
 
+                  // Primary: Customer Name | Secondary: Phone Number
+                  const rawName = card.contacts?.name || '';
+                  const isPhoneOnlyName = !rawName || /^\d+$/.test(rawName.trim());
+                  const displayName = (!isPhoneOnlyName)
+                    ? rawName
+                    : card.collected_data?.['Nome'] || card.collected_data?.['Nome do Cliente'] || card.collected_data?.['Nome Completo'] || rawName || 'Cliente';
+                  const displayPhone = card.contacts?.phone || '';
+
                   return (
                     <div
                       key={card.id}
@@ -292,9 +300,18 @@ export function KanbanBoard({ tenantId, apiBaseUrl }) {
                         </div>
                       </div>
 
-                      <div className="card-contact">
-                        <div className="contact-name"><User size={14} /> {card.contacts?.name || 'Cliente'}</div>
-                        <div className="contact-phone"><Phone size={12} /> {card.contacts?.phone}</div>
+                      {/* Primary: Customer Name | Secondary: Phone Number */}
+                      <div className="card-contact" style={{ marginTop: '8px', marginBottom: '6px' }}>
+                        <div className="contact-name" style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <User size={16} style={{ color: 'var(--primary-accent)' }} />
+                          <span>{displayName}</span>
+                        </div>
+                        {displayPhone && (
+                          <div className="contact-phone" style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Phone size={12} />
+                            <span>{displayPhone}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Small Hover & Collapsed Indicator Hint */}
