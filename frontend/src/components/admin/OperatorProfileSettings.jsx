@@ -128,6 +128,77 @@ export function OperatorProfileSettings() {
         </div>
       </div>
 
+      {/* Personalização do Gradiente RGB do Fundo da Tela */}
+      <div className="form-group glass-subcard" style={{ padding: '20px', marginTop: '20px' }}>
+        <label className="form-label" style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Sparkles size={18} style={{ color: 'var(--primary-accent)' }} /> Gradiente RGB do Fundo da Sua Tela:
+        </label>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+          Personalize as cores do gradiente RGB que flui ao fundo da sua tela. Cada usuário (dono ou funcionário) pode definir o seu estilo visual exclusivo!
+        </p>
+
+        {/* Preset Gradients */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '16px' }}>
+          {[
+            { name: '🌌 Aurora Neon', c1: '#6366f1', c2: '#10b981' },
+            { name: '🌊 Oceano Profundo', c1: '#06b6d4', c2: '#3b82f6' },
+            { name: '🔥 Pôr do Sol Mágico', c1: '#f59e0b', c2: '#ec4899' },
+            { name: '💜 Cyberpunk Violeta', c1: '#8b5cf6', c2: '#22d3ee' }
+          ].map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              className="btn secondary"
+              onClick={() => updatePreferences({ rgb_color1: preset.c1, rgb_color2: preset.c2, accent_color: preset.c1 })}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'space-between',
+                padding: '10px 14px',
+                fontSize: '0.82rem',
+                border: '1px solid var(--border-light)',
+                borderRadius: '10px'
+              }}
+            >
+              <span>{preset.name}</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: preset.c1 }} />
+                <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: preset.c2 }} />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Custom RGB Color Pickers */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--bg-card)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem' }}>Tom RGB Principal 1:</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="color"
+                value={accentColor || '#6366f1'}
+                onChange={(e) => updatePreferences({ rgb_color1: e.target.value, accent_color: e.target.value })}
+                style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'none' }}
+              />
+              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{accentColor || '#6366f1'}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem' }}>Tom RGB Secundário 2:</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="color"
+                value={rgbColor2 || '#10b981'}
+                onChange={(e) => updatePreferences({ rgb_color2: e.target.value })}
+                style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'none' }}
+              />
+              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{rgbColor2 || '#10b981'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Cor dos Botões */}
       <div className="form-group glass-subcard" style={{ padding: '20px', marginTop: '20px' }}>
         <label className="form-label" style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '12px' }}>
@@ -138,10 +209,10 @@ export function OperatorProfileSettings() {
           {colorPalettes.map((c) => (
             <div
               key={c.hex}
-              onClick={() => updatePreferences({ accent_color: c.hex })}
+              onClick={() => updatePreferences({ accent_color: c.hex, rgb_color1: c.hex })}
               style={{
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: accentColor === c.hex ? `2px solid ${c.hex}` : '1px solid var(--border-glass)',
+                background: 'var(--bg-card)',
+                border: accentColor === c.hex ? `2px solid ${c.hex}` : '1px solid var(--border-light)',
                 borderRadius: '10px',
                 padding: '12px',
                 display: 'flex',

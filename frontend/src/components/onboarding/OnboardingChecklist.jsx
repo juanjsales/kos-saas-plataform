@@ -20,7 +20,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
       whatsapp: !!whatsappConnected,
       service: hasService,
       card: hasCard,
-      rule: hasService // If service created, rules are active
+      rule: hasService
     }));
   }, [whatsappConnected, serviceCount, cardsCount]);
 
@@ -35,14 +35,15 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
         position: 'fixed',
         bottom: '24px',
         right: '24px',
-        width: '320px',
+        width: '330px',
         zIndex: 9999,
-        borderRadius: '16px',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
-        border: '1px solid rgba(99, 102, 241, 0.4)',
-        background: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(16px)',
-        transition: 'all 0.3s ease'
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-lg)',
+        border: '1px solid var(--border-light)',
+        background: 'var(--bg-card)',
+        padding: '0',
+        overflow: 'hidden',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
       }}
     >
       {/* Widget Header */}
@@ -51,30 +52,31 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
         onClick={() => setIsOpen(!isOpen)}
         style={{
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           padding: '14px 16px',
           cursor: 'pointer',
-          borderBottom: isOpen ? '1px solid var(--border-glass)' : 'none'
+          borderBottom: isOpen ? '1px solid var(--border-light)' : 'none',
+          background: 'var(--bg-subcard)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Sparkles size={18} style={{ color: 'var(--primary-accent)' }} />
-          <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#f8fafc' }}>
+          <span style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--text-primary)' }}>
             Checklist de Configuração ({completedItems}/{totalItems})
           </span>
         </div>
-        {isOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+        {isOpen ? <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronUp size={18} style={{ color: 'var(--text-muted)' }} />}
       </div>
 
-      {/* Progress Bar */}
-      <div style={{ padding: '0 16px', marginTop: isOpen ? '10px' : '0' }}>
-        <div style={{ height: '6px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+      {/* Dynamic Theme Gradient Progress Bar */}
+      <div style={{ padding: '0 16px', marginTop: isOpen ? '12px' : '0' }}>
+        <div style={{ height: '6px', width: '100%', background: 'var(--border-light)', borderRadius: '3px', overflow: 'hidden' }}>
           <div
             style={{
               height: '100%',
               width: `${percentage}%`,
-              background: 'linear-gradient(90deg, #6366f1, #10b981)',
+              background: 'linear-gradient(90deg, var(--primary-accent), var(--secondary-accent))',
               transition: 'width 0.4s ease'
             }}
           />
@@ -95,6 +97,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 gap: '10px',
                 fontSize: '0.82rem',
                 cursor: 'pointer',
+                color: 'var(--text-primary)',
                 opacity: progress.whatsapp ? 0.6 : 1,
                 textDecoration: progress.whatsapp ? 'line-through' : 'none'
               }}
@@ -113,6 +116,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 gap: '10px',
                 fontSize: '0.82rem',
                 cursor: 'pointer',
+                color: 'var(--text-primary)',
                 opacity: progress.service ? 0.6 : 1,
                 textDecoration: progress.service ? 'line-through' : 'none'
               }}
@@ -131,6 +135,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 gap: '10px',
                 fontSize: '0.82rem',
                 cursor: 'pointer',
+                color: 'var(--text-primary)',
                 opacity: progress.rule ? 0.6 : 1,
                 textDecoration: progress.rule ? 'line-through' : 'none'
               }}
@@ -149,6 +154,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
                 gap: '10px',
                 fontSize: '0.82rem',
                 cursor: 'pointer',
+                color: 'var(--text-primary)',
                 opacity: progress.card ? 0.6 : 1,
                 textDecoration: progress.card ? 'line-through' : 'none'
               }}
@@ -160,7 +166,7 @@ export function OnboardingChecklist({ onNavigateTab, whatsappConnected, serviceC
 
           </ul>
 
-          <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button
               type="button"
               className="btn secondary"

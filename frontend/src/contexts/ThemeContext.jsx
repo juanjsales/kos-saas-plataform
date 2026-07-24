@@ -16,12 +16,26 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
   // Level 2: Operator Custom Preferences
   const [themeMode, setThemeMode] = useState('dark'); // 'dark', 'light', 'system'
   const [accentColor, setAccentColor] = useState('#6366f1');
+  const [rgbColor1, setRgbColor1] = useState('#6366f1');
+  const [rgbColor2, setRgbColor2] = useState('#10b981');
   const [kanbanDensity, setKanbanDensity] = useState('comfortable');
 
   const rawUrl = apiBaseUrl || import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
   const safeApiUrl = (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')))
     ? 'https://kos-backend-tuqi.onrender.com'
     : rawUrl;
+
+  const hexToRgba = (hex, alpha = 0.14) => {
+    if (!hex) return `rgba(99, 102, 241, ${alpha})`;
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    if (isNaN(num)) return `rgba(99, 102, 241, ${alpha})`;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
 
   // Fetch Tenant Company Branding in Real Time
   useEffect(() => {
@@ -65,6 +79,8 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
           const prefs = await res.json();
           if (prefs.theme_mode) setThemeMode(prefs.theme_mode);
           if (prefs.accent_color) setAccentColor(prefs.accent_color);
+          if (prefs.rgb_color1) setRgbColor1(prefs.rgb_color1);
+          if (prefs.rgb_color2) setRgbColor2(prefs.rgb_color2);
           if (prefs.kanban_density) setKanbanDensity(prefs.kanban_density);
         }
       } catch (err) {
@@ -79,6 +95,8 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
     const root = document.documentElement;
     root.style.setProperty('--primary-accent', accentColor);
     root.style.setProperty('--brand-primary', tenantBrandColor);
+    root.style.setProperty('--gradient-rgb-1', hexToRgba(rgbColor1, 0.16));
+    root.style.setProperty('--gradient-rgb-2', hexToRgba(rgbColor2, 0.16));
 
     if (themeMode === 'light') {
       document.body.classList.add('light-theme');
@@ -87,15 +105,17 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
       document.body.classList.add('dark-theme');
       document.body.classList.remove('light-theme');
     }
-  }, [accentColor, tenantBrandColor, themeMode]);
+  }, [accentColor, tenantBrandColor, themeMode, rgbColor1, rgbColor2]);
 
   const updatePreferences = async (newPrefs) => {
     if (newPrefs.theme_mode) setThemeMode(newPrefs.theme_mode);
     if (newPrefs.accent_color) setAccentColor(newPrefs.accent_color);
+    if (newPrefs.rgb_color1) setRgbColor1(newPrefs.rgb_color1);
+    if (newPrefs.rgb_color2) setRgbColor2(newPrefs.rgb_color2);
     if (newPrefs.kanban_density) setKanbanDensity(newPrefs.kanban_density);
 
     try {
-      await fetch(`${apiBaseUrl}/api/user/preferences`, {
+      await fetch(`${safeApiUrl}/api/user/preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,6 +142,8 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
       tenantBrandColor,
       themeMode,
       accentColor,
+      rgbColor1,
+      rgbColor2,
       kanbanDensity,
       updatePreferences,
       updateTenantBranding,

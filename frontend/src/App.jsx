@@ -196,16 +196,28 @@ function AppContent() {
           )}
 
           {!isSuperAdmin && (
-            <button
-              className={`btn-status ${waStatus.connected ? 'status-connected' : 'status-disconnected'}`}
-              onClick={() => {
-                setShowQrModal(true);
-                checkWaStatus(true);
-              }}
-            >
-              {waStatus.connected ? <CheckCircle2 size={16} /> : <QrCode size={16} />}
-              <span>{waStatus.connected ? 'WhatsApp Funcionando' : 'Conectar WhatsApp'}</span>
-            </button>
+            (userRole === 'tenant_admin') ? (
+              <button
+                className={`btn-status ${waStatus.connected ? 'status-connected' : 'status-disconnected'}`}
+                onClick={() => {
+                  setShowQrModal(true);
+                  checkWaStatus(true);
+                }}
+                title="Configurar conexão do WhatsApp da Empresa"
+              >
+                {waStatus.connected ? <CheckCircle2 size={16} /> : <QrCode size={16} />}
+                <span>{waStatus.connected ? 'WhatsApp Funcionando' : 'Conectar WhatsApp'}</span>
+              </button>
+            ) : (
+              <div
+                className={`btn-status ${waStatus.connected ? 'status-connected' : 'status-disconnected'}`}
+                style={{ cursor: 'default', opacity: 0.9 }}
+                title="Conexão do WhatsApp gerenciada exclusivamente pelo Dono da Empresa"
+              >
+                {waStatus.connected ? <CheckCircle2 size={16} /> : <QrCode size={16} />}
+                <span>{waStatus.connected ? 'WhatsApp da Empresa Ativo' : 'WhatsApp Desconectado (Fale com o Dono)'}</span>
+              </div>
+            )
           )}
         </div>
       </header>

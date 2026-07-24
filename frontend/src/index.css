@@ -42,16 +42,55 @@
   padding: 0;
 }
 
+/* Driver.js Product Tour Styled to match system design system */
+.driver-popover {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  padding: 20px !important;
+}
+
+.driver-popover-title {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: var(--text-primary) !important;
+}
+
+.driver-popover-description {
+  font-size: 0.88rem !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.5 !important;
+}
+
+.driver-popover-next-btn,
+.driver-popover-prev-btn,
+.driver-popover-close-btn {
+  border-radius: var(--radius-sm) !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  padding: 6px 12px !important;
+}
+
+.driver-popover-next-btn {
+  background: var(--primary-accent) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
 body {
   font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: var(--bg-main);
   background-image: 
-    radial-gradient(at 10% 10%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
-    radial-gradient(at 90% 90%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+    radial-gradient(at 10% 10%, var(--gradient-rgb-1, rgba(99, 102, 241, 0.14)) 0px, transparent 65%),
+    radial-gradient(at 90% 90%, var(--gradient-rgb-2, rgba(16, 185, 129, 0.14)) 0px, transparent 65%);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
+  transition: background 0.5s ease;
 }
 
 /* Friendly Clean Cards */
