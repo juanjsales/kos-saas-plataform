@@ -27,11 +27,14 @@ export function formatDateValue(val) {
  * Replaces placeholders like {contact_name}, {service_title}, {status}, {card_id} in template text
  */
 export function interpolateTemplate(template, data) {
-  let result = template;
+  let result = template || '';
+  if (!data || typeof data !== 'object') return result;
+
   for (const [key, value] of Object.entries(data)) {
-    const placeholder = new RegExp(`\\{${key}\\}`, 'g');
+    const placeholder = `{${key}}`;
     const formattedVal = formatDateValue(value);
-    result = result.replace(placeholder, formattedVal !== undefined && formattedVal !== null ? formattedVal : '');
+    const repVal = (formattedVal !== undefined && formattedVal !== null) ? String(formattedVal) : '';
+    result = result.split(placeholder).join(repVal);
   }
   return result;
 }

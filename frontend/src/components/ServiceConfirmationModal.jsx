@@ -11,15 +11,32 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
   const [isDragOver, setIsDragOver] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState(card?.attachment_url || '');
-  const [metadata, setMetadata] = useState(card?.attachment_metadata || {
-    document_number: '',
-    rg_number: '',
-    cpf: '',
-    full_name: card?.contacts?.name || '',
-    total_value: '',
-    document_date: new Date().toISOString().split('T')[0],
-    notes: ''
-  });
+  const safeMetadataInit = () => {
+    let initial = {
+      document_number: '',
+      rg_number: '',
+      cpf: '',
+      full_name: card?.contacts?.name || '',
+      total_value: '',
+      document_date: new Date().toISOString().split('T')[0],
+      notes: ''
+    };
+    if (card?.attachment_metadata) {
+      if (typeof card.attachment_metadata === 'object' && card.attachment_metadata !== null) {
+        initial = { ...initial, ...card.attachment_metadata };
+      } else if (typeof card.attachment_metadata === 'string') {
+        try {
+          const parsed = JSON.parse(card.attachment_metadata);
+          if (parsed && typeof parsed === 'object') {
+            initial = { ...initial, ...parsed };
+          }
+        } catch (e) {}
+      }
+    }
+    return initial;
+  };
+
+  const [metadata, setMetadata] = useState(safeMetadataInit);
 
   useEffect(() => {
     async function fetchServiceDetails() {
@@ -47,7 +64,7 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
   // Safety Lock check: verify all required fields are filled
   const isFormValid = customFields.every(field => {
     if (!field.is_required) return true;
-    const val = collectedData[field.field_label];
+    const val = collectedData ? collectedData[field.field_label] : undefined;
     return val !== undefined && val !== null && String(val).trim() !== '';
   });
 
@@ -69,28 +86,37 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
     return str;
   };
 
+  const safeReplaceAll = (sourceText, searchKey, replacementVal) => {
+    if (!sourceText) return '';
+    const target = `{${searchKey}}`;
+    return sourceText.split(target).join(replacementVal);
+  };
+
   // Calculate Real-Time WhatsApp Live Message Preview
   const generateLiveMessage = () => {
-    let message = rawTemplate;
+    let message = rawTemplate || 'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!';
+    const activeMeta = metadata || {};
     const variables = {
       contact_name: card?.contacts?.name || 'Cliente',
       service_title: card?.services?.title || targetService?.title || 'Serviço',
       status: card?.status === 'completed' ? 'Concluído' : (card?.status || 'Confirmado'),
       confirmed_at: new Date().toLocaleDateString('pt-BR'),
-      protocol_number: metadata.protocol_number || metadata.document_number || '',
-      appointment_location: metadata.appointment_location || '',
-      appointment_date: metadata.appointment_date || metadata.document_date || '',
-      appointment_time: metadata.appointment_time || '',
-      notes: metadata.notes || '',
-      document_number: metadata.document_number || metadata.protocol_number || '',
-      total_value: metadata.total_value || '',
-      ...collectedData
+      protocol_number: activeMeta.protocol_number || activeMeta.document_number || '',
+      appointment_location: activeMeta.appointment_location || '',
+      appointment_date: activeMeta.appointment_date || activeMeta.document_date || '',
+      appointment_time: activeMeta.appointment_time || '',
+      notes: activeMeta.notes || '',
+      document_number: activeMeta.document_number || activeMeta.protocol_number || '',
+      total_value: activeMeta.total_value || '',
+      ...(collectedData || {})
     };
 
     for (const [key, val] of Object.entries(variables)) {
-      const regex = new RegExp(`\\{${key}\\}`, 'g');
       const displayVal = formatValue(val);
-      message = message.replace(regex, displayVal !== undefined && displayVal !== null && String(displayVal).trim() !== '' ? String(displayVal) : `[${key}]`);
+      const repText = (displayVal !== undefined && displayVal !== null && String(displayVal).trim() !== '') 
+        ? String(displayVal) 
+        : `[${key}]`;
+      message = safeReplaceAll(message, key, repText);
     }
 
     return message;
