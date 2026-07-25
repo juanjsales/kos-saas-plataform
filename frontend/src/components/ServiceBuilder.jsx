@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle2, Layers, HelpCircle, FileText, GripVertical, ArrowUp, ArrowDown, Bot, Globe, Link2, Zap, Settings, MessageSquare, Clock, ShieldCheck, Check, Sparkles, Edit3, X } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Layers, HelpCircle, FileText, GripVertical, ArrowUp, ArrowDown, Bot, Globe, Link2, Zap, Settings, MessageSquare, Clock, ShieldCheck, Check, Sparkles, Edit3, X, Search, Copy, ArrowLeft } from 'lucide-react';
 import { ServiceTemplatesModal } from './onboarding/ServiceTemplatesModal';
 
 export function ServiceBuilder({ tenantId, apiBaseUrl }) {
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'form'
   const [activeTab, setActiveTab] = useState('form'); // 'form', 'confirmation', 'rpa', 'workflows'
   const [services, setServices] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState(null);
 
@@ -57,6 +59,23 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     if (tenantId) fetchServices();
   }, [tenantId]);
 
+  // Start Creating a New Service
+  const handleStartCreateNew = () => {
+    setEditingServiceId(null);
+    setTitle('');
+    setDescription('');
+    setCompletionType('identity');
+    setConfirmationTemplate('Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
+    setExternalUrl('');
+    setSubmitSelector('');
+    setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
+    setWorkflowRules([]);
+    setCustomFields([{ field_label: '', field_type: 'text', options: '', is_required: false }]);
+    setMessage(null);
+    setActiveTab('form');
+    setViewMode('form');
+  };
+
   // Start Editing an existing Service
   const handleStartEditService = (service) => {
     setEditingServiceId(service.id);
@@ -85,25 +104,46 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       setSubmitSelector('');
     }
 
-    setMessage({ type: 'info', text: `Modo de Edição ativado para o serviço "${service.title}". Faça as alterações e clique em Salvar.` });
+    setMessage(null);
+    setActiveTab('form');
+    setViewMode('form');
 
-    // Scroll to top
     const elem = document.getElementById('tour-service-builder');
     if (elem) elem.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Cancel Editing
-  const handleCancelEdit = () => {
+  // Duplicate a Service
+  const handleDuplicateService = (service) => {
     setEditingServiceId(null);
-    setTitle('');
-    setDescription('');
-    setCompletionType('identity');
-    setConfirmationTemplate('Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
-    setExternalUrl('');
-    setSubmitSelector('');
-    setAutomationMappings([{ css_selector: '', source_field: 'Nome do Cliente' }]);
-    setWorkflowRules([]);
-    setCustomFields([{ field_label: '', field_type: 'text', options: '', is_required: false }]);
+    setTitle(`${service.title} (Cópia)`);
+    setDescription(service.description || '');
+    setCompletionType(service.completion_type || 'identity');
+    setConfirmationTemplate(service.confirmation_template || 'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!');
+    setExternalUrl(service.external_url || '');
+
+    if (service.custom_fields && service.custom_fields.length > 0) {
+      setCustomFields(service.custom_fields.map(f => ({
+        field_label: f.field_label || '',
+        field_type: f.field_type || 'text',
+        options: f.options || '',
+        is_required: !!f.is_required
+      })));
+    }
+
+    if (service.automation_mapping?.mappings && service.automation_mapping.mappings.length > 0) {
+      setAutomationMappings(service.automation_mapping.mappings);
+      setSubmitSelector(service.automation_mapping.submit_selector || '');
+    }
+
+    setActiveTab('form');
+    setViewMode('form');
+    setMessage({ type: 'info', text: `Cópia criada a partir do serviço "${service.title}". Ajuste o nome e clique em Salvar.` });
+  };
+
+  // Cancel Form and Return to List
+  const handleBackToList = () => {
+    setViewMode('list');
+    setEditingServiceId(null);
     setMessage(null);
   };
 
@@ -119,7 +159,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
       if (res.ok) {
         setMessage({ type: 'success', text: `Serviço "${serviceTitle}" excluído com sucesso!` });
         if (editingServiceId === serviceId) {
-          handleCancelEdit();
+          handleBackToList();
         }
         fetchServices();
       } else {
@@ -131,7 +171,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     }
   };
 
-  // Apply 1-Click Setup Template Data
+  // Apply Template
   const handleApplyTemplate = (tmplData) => {
     setEditingServiceId(null);
     setTitle(tmplData.title || '');
@@ -144,7 +184,9 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     setSubmitSelector(tmplData.automation_mapping?.submit_selector || '');
     setWorkflowRules(tmplData.workflow_rules || []);
 
-    setMessage({ type: 'success', text: `Template "${tmplData.title}" carregado! Todas as abas foram preenchidas. Clique em Salvar.` });
+    setActiveTab('form');
+    setViewMode('form');
+    setMessage({ type: 'success', text: `Template "${tmplData.title}" carregado! Confira os dados e clique em Salvar.` });
   };
 
   // Custom Fields Handlers
@@ -249,39 +291,23 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
           description,
           completion_type: completionType,
           confirmation_template: confirmationTemplate,
-          external_url: externalUrl || null,
+          external_url: externalUrl,
           automation_mapping: automationPayload,
           custom_fields: validFields
         })
       });
 
       if (res.ok) {
-        const savedService = await res.json();
-
-        // Save Workflow Rules for this service if any
-        for (const rule of workflowRules) {
-          await fetch(`${apiBaseUrl}/api/notifications/rules`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tenant_id: tenantId,
-              service_id: savedService.id,
-              trigger_event: rule.trigger_type,
-              template_body: rule.action_config?.template_body || 'Notificação',
-              is_active: true
-            })
-          }).catch(() => {});
-        }
-
         setMessage({
           type: 'success',
           text: isEdit
             ? `Serviço "${title}" atualizado com sucesso!`
-            : 'Serviço No-Code criado e salvo com sucesso!'
+            : `Novo serviço "${title}" criado com sucesso!`
         });
 
-        handleCancelEdit();
         fetchServices();
+        setViewMode('list');
+        setEditingServiceId(null);
       } else {
         const errData = await res.json();
         setMessage({ type: 'error', text: errData.error || 'Erro ao salvar serviço' });
@@ -293,6 +319,11 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
     }
   };
 
+  const filteredServices = services.filter(s => 
+    s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.description && s.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   const availableSourceFields = [
     'Nome do Cliente',
     'Telefone',
@@ -303,412 +334,434 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
   return (
     <div id="tour-service-builder" className="builder-container glass-card">
-      <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <div>
-          <h2><Zap size={26} className="accent-icon" /> Cadastrar e Editar Serviços da Sua Empresa</h2>
-          <p>Configure o nome dos seus serviços, perguntas para os clientes e mensagens automáticas de forma muito fácil!</p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {editingServiceId && (
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleCancelEdit}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <X size={16} /> Cancelar Edição
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => setShowTemplatesModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
-          >
-            <Sparkles size={18} /> Usar um Modelo Já Pronto
-          </button>
-        </div>
-      </div>
-
       {message && (
-        <div className={`alert-banner ${message.type}`}>
+        <div className={`alert-banner ${message.type}`} style={{ marginBottom: '16px' }}>
           {message.text}
         </div>
       )}
 
-      {/* 4-Tab Navigation Bar */}
-      <div className="nocode-tabs-bar glass-subcard" style={{ display: 'flex', gap: '8px', padding: '6px', marginBottom: '24px', borderRadius: '12px' }}>
-        <button
-          type="button"
-          className={`nocode-tab ${activeTab === 'form' ? 'active' : ''}`}
-          onClick={() => setActiveTab('form')}
-        >
-          <FileText size={18} /> 1. Perguntas do Serviço
-        </button>
-
-        <button
-          type="button"
-          className={`nocode-tab ${activeTab === 'confirmation' ? 'active' : ''}`}
-          onClick={() => setActiveTab('confirmation')}
-        >
-          <CheckCircle2 size={18} /> 2. Foto ou Recibo de Conclusão
-        </button>
-
-        <button
-          type="button"
-          className={`nocode-tab ${activeTab === 'rpa' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rpa')}
-        >
-          <Bot size={18} /> 3. Digitação Automática (Opcional)
-        </button>
-
-        <button
-          type="button"
-          className={`nocode-tab ${activeTab === 'workflows' ? 'active' : ''}`}
-          onClick={() => setActiveTab('workflows')}
-        >
-          <Zap size={18} /> 4. Avisos Automáticos no WhatsApp
-        </button>
-      </div>
-
-      {/* Form Content */}
-      <form onSubmit={handleSubmit}>
-        <div className="form-group glass-subcard" style={{ padding: '16px', marginBottom: '20px' }}>
-          <div className="form-group-row" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: '700' }}>Nome do Serviço *</label>
-              <input
-                type="text"
-                className="input-control"
-                placeholder="Ex: Agendamento, Venda, Segunda Via, Consulta"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
+      {/* VIEW MODE 1: SERVICES LISTING & DASHBOARD */}
+      {viewMode === 'list' ? (
+        <div className="services-dashboard">
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <h2><Layers size={26} className="accent-icon" /> Gestão de Serviços da Sua Empresa</h2>
+              <p>Gerencie, crie e edite os serviços prestados aos seus clientes.</p>
             </div>
 
-            <div className="form-group">
-              <label className="form-label" style={{ fontWeight: '700' }}>Descrição Simples</label>
-              <input
-                type="text"
-                className="input-control"
-                placeholder="Uma explicação curta sobre o que é esse serviço..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setShowTemplatesModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}
+              >
+                <Sparkles size={18} /> Usar Template Pronto
+              </button>
+
+              <button
+                type="button"
+                className="btn primary"
+                onClick={handleStartCreateNew}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
+              >
+                <Plus size={20} /> Cadastrar Novo Serviço
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* TAB 1: FORMULÁRIO PERSONALIZADO */}
-        {activeTab === 'form' && (
-          <div className="glass-subcard" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileText size={20} className="accent-icon" /> Perguntas que o Cliente ou Atendente Deve Preencher
-            </h3>
-
-            {customFields.map((field, index) => (
-              <div
-                key={index}
-                className="field-row glass-row"
-                style={{ display: 'grid', gridTemplateColumns: '30px 2fr 1.5fr 1fr 40px', gap: '12px', alignItems: 'center', marginBottom: '10px', padding: '10px 14px' }}
-              >
-                <GripVertical size={20} style={{ color: 'var(--text-muted)', cursor: 'grab' }} />
-
-                <input
-                  type="text"
-                  className="input-control"
-                  placeholder="Escreva a pergunta (Ex: Qual o seu CPF?, Endereço)"
-                  value={field.field_label}
-                  onChange={(e) => handleFieldChange(index, 'field_label', e.target.value)}
-                />
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <select
-                    className="input-control select-control"
-                    value={field.field_type}
-                    onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
-                  >
-                    <option value="text">✏️ Texto Curto (Ex: Nome)</option>
-                    <option value="textarea">📝 Texto Grande (Ex: Observações)</option>
-                    <option value="number">🔢 Número ou Valor R$</option>
-                    <option value="cpf">🪪 CPF ou CNPJ</option>
-                    <option value="phone">📞 Telefone com DDD</option>
-                    <option value="date">📅 Data (Dia/Mês/Ano)</option>
-                    <option value="time">⏰ Horário (Hora:Minuto)</option>
-                    <option value="select">📋 Lista de Opções para Escolher</option>
-                    <option value="checkbox">☑️ Caixas para Marcar Várias Opções</option>
-                    <option value="file">📎 Foto / Documento PDF</option>
-                  </select>
-
-                  {(field.field_type === 'select' || field.field_type === 'checkbox') && (
-                    <input
-                      type="text"
-                      className="input-control"
-                      placeholder="Opções separadas por vírgula. Ex: Manhã, Tarde, Noite"
-                      value={field.options || ''}
-                      onChange={(e) => handleFieldChange(index, 'options', e.target.value)}
-                    />
-                  )}
-                </div>
-
-                <label className="checkbox-label" style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input
-                    type="checkbox"
-                    checked={field.is_required}
-                    onChange={(e) => handleFieldChange(index, 'is_required', e.target.checked)}
-                  />
-                  Obrigatório
-                </label>
-
-                <button type="button" className="btn-icon danger" onClick={() => removeCustomField(index)}>
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))}
-
-            <button type="button" className="btn secondary" onClick={addCustomField} style={{ marginTop: '12px' }}>
-              <Plus size={16} /> Adicionar Nova Pergunta
-            </button>
+          {/* Search Bar */}
+          <div className="search-box glass-subcard" style={{ marginBottom: '24px', padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Search size={18} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Buscar serviço por nome ou descrição..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+            />
           </div>
-        )}
 
-        {/* TAB 2: MODAL DE CONCLUSÃO */}
-        {activeTab === 'confirmation' && (
-          <div className="glass-subcard" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={20} className="accent-icon" /> O que o atendente deve enviar ao terminar o serviço:
-            </h3>
-
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <select
-                className="input-control select-control"
-                value={completionType}
-                onChange={(e) => setCompletionType(e.target.value)}
-                style={{ fontWeight: '600' }}
-              >
-                <option value="identity">🆔 Foto do Documento (RG / CPF) com leitura automática de dados</option>
-                <option value="financial">🧾 Comprovante / Recibo / Nota Fiscal com leitura do Valor R$</option>
-                <option value="custom_fields">📋 Responder as perguntas cadastradas do serviço</option>
-                <option value="simple">📝 Apenas uma mensagem simples de confirmação</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
-              <label className="form-label" style={{ fontWeight: '700', fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MessageSquare size={16} style={{ color: '#25D366' }} /> Texto da Mensagem enviada ao WhatsApp do Cliente ao Confirmar:
-              </label>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Altere aqui o texto exato que o dono e os funcionários enviam para o celular do cliente ao clicar no botão de confirmação:
+          {/* Services Grid */}
+          {filteredServices.length === 0 ? (
+            <div className="glass-subcard" style={{ padding: '40px', textAlign: 'center', borderRadius: '16px' }}>
+              <Layers size={48} style={{ color: 'var(--primary-accent)', opacity: 0.5, margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '6px' }}>
+                {searchTerm ? 'Nenhum serviço encontrado para essa busca.' : 'Nenhum serviço cadastrado ainda.'}
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
+                {searchTerm ? 'Tente buscar com outro termo.' : 'Clique no botão abaixo para cadastrar o primeiro serviço da sua empresa!'}
               </p>
-              <textarea
-                className="input-control textarea-control"
-                placeholder="Ex: Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!"
-                value={confirmationTemplate}
-                onChange={(e) => setConfirmationTemplate(e.target.value)}
-                rows={4}
-                style={{ fontSize: '0.9rem', lineHeight: '1.5' }}
-              />
-              <span style={{ fontSize: '0.78rem', color: 'var(--primary-accent)', marginTop: '6px', display: 'block' }}>
-                💡 Você pode usar &#123;contact_name&#125;, &#123;service_title&#125;, &#123;status&#125; ou o nome de qualquer pergunta no texto!
-              </span>
+              {!searchTerm && (
+                <button type="button" className="btn primary" onClick={handleStartCreateNew} style={{ padding: '10px 20px' }}>
+                  <Plus size={18} /> Cadastrar Meu Primeiro Serviço
+                </button>
+              )}
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+              {filteredServices.map((service) => (
+                <div key={service.id} className="glass-card service-crud-card" style={{ padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid var(--border-light)', transition: 'transform 0.2s, box-shadow 0.2s' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                      <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: '800', color: 'var(--text-primary)' }}>{service.title}</h3>
+                      <span className="badge" style={{ fontSize: '0.72rem', fontWeight: '700', padding: '4px 10px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--primary-accent)', borderRadius: '20px' }}>
+                        {service.completion_type === 'document_delivery' ? '📄 Documento' :
+                         service.completion_type === 'appointment' ? '📅 Agendamento' :
+                         service.completion_type === 'pix_payment' ? '💳 PIX' : '📝 Personalizado'}
+                      </span>
+                    </div>
 
-        {/* TAB 3: AUTOMAÇÃO RPA */}
-        {activeTab === 'rpa' && (
-          <div className="glass-subcard" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-accent)' }}>
-              <Bot size={20} /> Digitação Automática em Outros Portais (Opcional)
-            </h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px', minHeight: '40px', lineHeight: '1.4' }}>
+                      {service.description || 'Sem descrição cadastrada.'}
+                    </p>
 
-            <div className="form-group">
-              <label className="form-label"><Globe size={14} /> Endereço (URL) do Site Externo</label>
-              <input
-                type="url"
-                className="input-control"
-                placeholder="Ex: https://portal.saude.gov.br/agendamento"
-                value={externalUrl}
-                onChange={(e) => setExternalUrl(e.target.value)}
-              />
-            </div>
+                    <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                      <span style={{ fontSize: '0.75rem', background: 'var(--bg-subcard)', padding: '3px 8px', borderRadius: '6px', color: 'var(--text-muted)' }}>
+                        📝 {service.custom_fields?.length || 0} Perguntas
+                      </span>
+                      {service.external_url && (
+                        <span style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', padding: '3px 8px', borderRadius: '6px', color: '#10b981' }}>
+                          🤖 Automação RPA Ativa
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-            <div style={{ marginTop: '16px' }}>
-              <label className="form-label" style={{ fontWeight: '600' }}>
-                Sequência de Ações do Robô no Site (Digitar, Rolar, Clicar, Aguardar Vagas):
-              </label>
-
-              {automationMappings.map((mapRow, idx) => (
-                <div key={idx} className="field-row glass-row" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 40px', gap: '12px', marginBottom: '8px', alignItems: 'center' }}>
-                  <select
-                    className="input-control select-control"
-                    value={mapRow.action_type || 'type'}
-                    onChange={(e) => handleMappingChange(idx, 'action_type', e.target.value)}
-                  >
-                    <option value="type">✏️ Digitar Dados no Campo</option>
-                    <option value="click">🖱️ Clicar em Botão / Link</option>
-                    <option value="scroll">📜 Rolar a Página (Para Baixo/Cima)</option>
-                    <option value="wait">⏰ Aguardar Carregar Vagas / Elemento</option>
-                    <option value="select">📋 Escolher Opção na Lista (Dropdown)</option>
-                  </select>
-
-                  <input
-                    type="text"
-                    className="input-control"
-                    placeholder={mapRow.action_type === 'scroll' ? 'Distância em pixels (Ex: 400)' : 'Campo no site (Ex: #input-cpf)'}
-                    value={mapRow.css_selector}
-                    onChange={(e) => handleMappingChange(idx, 'css_selector', e.target.value)}
-                  />
-
-                  {mapRow.action_type === 'scroll' ? (
-                    <input
-                      type="number"
-                      className="input-control"
-                      placeholder="Pixels (Ex: 400)"
-                      value={mapRow.scroll_amount || 300}
-                      onChange={(e) => handleMappingChange(idx, 'scroll_amount', e.target.value)}
-                    />
-                  ) : mapRow.action_type === 'wait' ? (
-                    <input
-                      type="number"
-                      className="input-control"
-                      placeholder="Tempo em ms (Ex: 2000)"
-                      value={mapRow.wait_ms || 2000}
-                      onChange={(e) => handleMappingChange(idx, 'wait_ms', e.target.value)}
-                    />
-                  ) : (
-                    <select
-                      className="input-control select-control"
-                      value={mapRow.source_field}
-                      onChange={(e) => handleMappingChange(idx, 'source_field', e.target.value)}
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-light)', paddingTop: '14px', marginTop: '10px' }}>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => handleDuplicateService(service)}
+                      title="Duplicar Serviço"
+                      style={{ fontSize: '0.8rem', padding: '8px 10px' }}
                     >
-                      {availableSourceFields.map(sf => (
-                        <option key={sf} value={sf}>{sf}</option>
-                      ))}
-                    </select>
-                  )}
+                      <Copy size={14} /> Duplicar
+                    </button>
 
-                  <button type="button" className="btn-icon danger" onClick={() => removeMappingRow(idx)}>
-                    <Trash2 size={18} />
-                  </button>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => handleStartEditService(service)}
+                      style={{ fontSize: '0.8rem', padding: '8px 12px' }}
+                    >
+                      <Edit3 size={14} /> Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn danger"
+                      onClick={() => handleDeleteService(service.id, service.title)}
+                      style={{ fontSize: '0.8rem', padding: '8px 10px' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
-
-              <button type="button" className="btn secondary" onClick={addMappingRow} style={{ marginTop: '8px', fontSize: '0.8rem' }}>
-                <Plus size={14} /> Adicionar Nova Ação ao Robô
-              </button>
             </div>
+          )}
+        </div>
+      ) : (
+        /* VIEW MODE 2: FORM / EDITING SERVICE */
+        <div className="service-form-editor">
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '20px' }}>
+            <div>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleBackToList}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '0.82rem', padding: '6px 12px' }}
+              >
+                <ArrowLeft size={16} /> Voltar para Lista de Serviços
+              </button>
+              <h2><Zap size={24} className="accent-icon" /> {editingServiceId ? `Editar Serviço: ${title}` : 'Cadastrar Novo Serviço'}</h2>
+              <p>Configure os dados do serviço, perguntas para os clientes e automações.</p>
+            </div>
+
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => setShowTemplatesModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}
+            >
+              <Sparkles size={18} /> Usar Template Pronto
+            </button>
           </div>
-        )}
 
-        {/* TAB 4: RÉGUAS & WORKFLOWS */}
-        {activeTab === 'workflows' && (
-          <div>
-            <div className="glass-subcard" style={{ padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1rem', color: 'var(--secondary-accent)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={20} /> Configurar Avisos Automáticos ("Quando acontecer algo ➔ Enviar mensagem")
-              </h3>
+          {/* 4-Tab Navigation Bar */}
+          <div className="nocode-tabs-bar glass-subcard" style={{ display: 'flex', gap: '8px', padding: '6px', marginBottom: '24px', borderRadius: '12px' }}>
+            <button
+              type="button"
+              className={`nocode-tab ${activeTab === 'form' ? 'active' : ''}`}
+              onClick={() => setActiveTab('form')}
+            >
+              <FileText size={18} /> 1. Perguntas do Serviço
+            </button>
 
-              <div className="form-group">
-                <label className="form-label">Título do Aviso</label>
+            <button
+              type="button"
+              className={`nocode-tab ${activeTab === 'confirmation' ? 'active' : ''}`}
+              onClick={() => setActiveTab('confirmation')}
+            >
+              <CheckCircle2 size={18} /> 2. Modal de Conclusão
+            </button>
+
+            <button
+              type="button"
+              className={`nocode-tab ${activeTab === 'rpa' ? 'active' : ''}`}
+              onClick={() => setActiveTab('rpa')}
+            >
+              <Bot size={18} /> 3. Robô RPA (Opcional)
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            {/* Basic Info */}
+            <div className="glass-subcard" style={{ padding: '20px', marginBottom: '20px', borderRadius: '12px' }}>
+              <div className="form-group" style={{ marginBottom: '14px' }}>
+                <label className="form-label">Nome do Serviço:</label>
                 <input
                   type="text"
                   className="input-control"
-                  placeholder="Ex: Avisar o cliente que o trabalho ficou pronto"
-                  value={newRuleTitle}
-                  onChange={(e) => setNewRuleTitle(e.target.value)}
+                  placeholder="Ex: Segundas Vias de Documentos, Agendamento de Consultas..."
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
                 />
               </div>
 
-              <div className="form-group-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">Quando deve enviar?</label>
-                  <select
-                    className="input-control select-control"
-                    value={newRuleTrigger}
-                    onChange={(e) => setNewRuleTrigger(e.target.value)}
-                  >
-                    <option value="on_card_created">⚡ Quando um novo pedido for aberto</option>
-                    <option value="on_status_change">🔄 Quando o pedido mudar de etapa</option>
-                    <option value="on_time_offset">⏰ Enviar lembrete após alguns minutos</option>
-                    <option value="on_rpa_success">🤖 Quando o robô terminar a digitação</option>
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">Descrição Simples do Serviço (Opcional):</label>
 
-                <div className="form-group">
-                  <label className="form-label">O que deve fazer?</label>
-                  <select
-                    className="input-control select-control"
-                    value={newRuleAction}
-                    onChange={(e) => setNewRuleAction(e.target.value)}
-                  >
-                    <option value="send_whatsapp">💬 Enviar mensagem automática no WhatsApp</option>
-                    <option value="run_rpa">🤖 Ativar preenchimento automático no site</option>
-                    <option value="move_card_status">📌 Mover o pedido para outra etapa</option>
-                  </select>
-                </div>
+                <textarea
+                  className="input-control textarea-control"
+                  placeholder="Ex: Serviço de emissão rápida de certidões e 2ª via com envio de comprovante."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                />
               </div>
-
-              <button type="button" className="btn secondary" onClick={addWorkflowRule}>
-                <Plus size={16} /> Adicionar Aviso ao Serviço
-              </button>
             </div>
-          </div>
-        )}
 
-        <button type="submit" className="btn primary submit-btn" disabled={loading} style={{ marginTop: '28px', width: '100%', padding: '14px', justifyContent: 'center' }}>
-          {loading ? 'Salvando...' : editingServiceId ? <><Edit3 size={20} /> Salvar Alterações no Serviço</> : <><CheckCircle2 size={20} /> Salvar Serviço</>}
-        </button>
-      </form>
-
-      {/* Lista de Serviços Existentes para Edição / Exclusão */}
-      <div className="existing-services-section glass-subcard" style={{ marginTop: '32px', padding: '20px' }}>
-        <h3 style={{ fontSize: '1.05rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Layers size={20} className="accent-icon" /> Meus Serviços Cadastrados ({services.length})
-        </h3>
-
-        {services.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nenhum serviço cadastrado ainda. Use o formulário acima para criar o primeiro!</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-            {services.map((service) => (
-              <div key={service.id} className="glass-card" style={{ padding: '16px', borderRadius: '14px', background: 'var(--bg-card)', border: editingServiceId === service.id ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <h4 style={{ fontSize: '1rem', margin: 0, fontWeight: '800', color: 'var(--text-primary)' }}>{service.title}</h4>
-                  <span className="badge" style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 8px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary-accent)', borderRadius: '6px' }}>{service.completion_type}</span>
+            {/* Tab 1: Custom Form Fields */}
+            {activeTab === 'form' && (
+              <div className="tab-pane">
+                <div className="section-header" style={{ marginBottom: '16px' }}>
+                  <h3><FileText size={20} className="accent-icon" /> Perguntas e Formulário Inicial</h3>
+                  <p>Adicione as perguntas que o cliente ou o atendente deve preencher ao abrir o pedido.</p>
                 </div>
 
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '14px', minHeight: '36px' }}>
-                  {service.description || 'Sem descrição cadastrada'}
-                </p>
+                <div className="custom-fields-list">
+                  {customFields.map((field, index) => (
+                    <div key={index} className="field-card glass-subcard" style={{ padding: '16px', marginBottom: '12px', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div className="field-drag-handle" style={{ color: 'var(--text-muted)', cursor: 'grab' }}>
+                        <GripVertical size={20} />
+                      </div>
 
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-light)', paddingTop: '12px' }}>
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    onClick={() => handleStartEditService(service)}
-                    style={{ fontSize: '0.82rem', padding: '8px 12px', gap: '6px' }}
-                  >
-                    <Edit3 size={14} /> Editar
-                  </button>
+                      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Pergunta / Rótulo:</label>
+                          <input
+                            type="text"
+                            className="input-control select-sm"
+                            placeholder="Ex: Número do CPF"
+                            value={field.field_label}
+                            onChange={(e) => handleFieldChange(index, 'field_label', e.target.value)}
+                          />
+                        </div>
 
-                  <button
-                    type="button"
-                    className="btn danger"
-                    onClick={() => handleDeleteService(service.id, service.title)}
-                    style={{ fontSize: '0.82rem', padding: '8px 12px', gap: '6px' }}
-                  >
-                    <Trash2 size={14} /> Excluir
-                  </button>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Tipo da Resposta:</label>
+                          <select
+                            className="input-control select-control select-sm"
+                            value={field.field_type}
+                            onChange={(e) => handleFieldChange(index, 'field_type', e.target.value)}
+                          >
+                            <option value="text">Texto Curto</option>
+                            <option value="textarea">Texto Longo</option>
+                            <option value="number">Número</option>
+                            <option value="date">Data</option>
+                            <option value="time">Hora</option>
+                            <option value="select">Lista de Opções (Select)</option>
+                            <option value="checkbox">Caixa de Seleção (Checkbox)</option>
+                            <option value="cpf">CPF / CNPJ</option>
+                            <option value="phone">Telefone / WhatsApp</option>
+                          </select>
+                        </div>
+
+                        {(field.field_type === 'select' || field.field_type === 'checkbox') ? (
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.75rem' }}>Opções (Separe por vírgula):</label>
+                            <input
+                              type="text"
+                              className="input-control select-sm"
+                              placeholder="Opção 1, Opção 2"
+                              value={field.options}
+                              onChange={(e) => handleFieldChange(index, 'options', e.target.value)}
+                            />
+                          </div>
+                        ) : <div />}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
+                          <label className="toggle-switch" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                            <input
+                              type="checkbox"
+                              checked={field.is_required}
+                              onChange={(e) => handleFieldChange(index, 'is_required', e.target.checked)}
+                            />
+                            <span>Obrigatório</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button type="button" className="btn-icon" onClick={() => moveField(index, index - 1)} disabled={index === 0} style={{ padding: '6px' }}>
+                          <ArrowUp size={16} />
+                        </button>
+                        <button type="button" className="btn-icon" onClick={() => moveField(index, index + 1)} disabled={index === customFields.length - 1} style={{ padding: '6px' }}>
+                          <ArrowDown size={16} />
+                        </button>
+                        <button type="button" className="btn-icon danger" onClick={() => removeCustomField(index)} style={{ padding: '6px' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button type="button" className="btn secondary" onClick={addCustomField} style={{ marginTop: '12px' }}>
+                  <Plus size={18} /> Adicionar Mais Uma Pergunta
+                </button>
+              </div>
+            )}
+
+            {/* Tab 2: Confirmation Modal Settings */}
+            {activeTab === 'confirmation' && (
+              <div className="tab-pane">
+                <div className="section-header" style={{ marginBottom: '16px' }}>
+                  <h3><CheckCircle2 size={20} className="accent-icon" /> Modelo do Modal de Finalização do Atendimento</h3>
+                  <p>Escolha qual formato de dados o atendente deve preencher ao concluir um pedido deste serviço.</p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label" style={{ fontWeight: '700' }}>Selecione o Formato de Conclusão:</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '8px' }}>
+                    <div
+                      className={`glass-subcard ${completionType === 'document_delivery' ? 'active-rule' : ''}`}
+                      onClick={() => setCompletionType('document_delivery')}
+                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'document_delivery' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
+                    >
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📄 Entrega de Documento / PDF</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige upload de arquivo PDF/Foto + OCR automático de número de protocolo.</p>
+                    </div>
+
+                    <div
+                      className={`glass-subcard ${completionType === 'appointment' ? 'active-rule' : ''}`}
+                      onClick={() => setCompletionType('appointment')}
+                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'appointment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
+                    >
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📅 Agendamento de Atendimento</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige preenchimento de Data, Hora e Local do agendamento.</p>
+                    </div>
+
+                    <div
+                      className={`glass-subcard ${completionType === 'pix_payment' ? 'active-rule' : ''}`}
+                      onClick={() => setCompletionType('pix_payment')}
+                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'pix_payment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
+                    >
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>💳 Cobrança / Código PIX</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige preenchimento do Valor Total (R$) e da chave de pagamento.</p>
+                    </div>
+
+                    <div
+                      className={`glass-subcard ${completionType === 'identity' ? 'active-rule' : ''}`}
+                      onClick={() => setCompletionType('identity')}
+                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'identity' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
+                    >
+                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📝 Personalizado / Padrão</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Utiliza as perguntas customizadas cadastradas no serviço.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: '700' }}>Texto Padrão da Mensagem de Finalização:</label>
+                  <textarea
+                    className="input-control textarea-control"
+                    placeholder="Ex: Olá {contact_name}, seu atendimento de {service_title} foi concluído com sucesso!"
+                    value={confirmationTemplate}
+                    onChange={(e) => setConfirmationTemplate(e.target.value)}
+                    rows={3}
+                  />
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )}
+
+            {/* Tab 3: RPA Automation */}
+            {activeTab === 'rpa' && (
+              <div className="tab-pane">
+                <div className="section-header" style={{ marginBottom: '16px' }}>
+                  <h3><Bot size={20} className="accent-icon" /> Robô de Automação RPA (Opcional)</h3>
+                  <p>Conecte um site externo onde um robô irá preencher os dados dos clientes automaticamente.</p>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label">Link do Site Externo (URL):</label>
+                  <input
+                    type="url"
+                    className="input-control"
+                    placeholder="https://exemplo.com.br/portal-do-cliente"
+                    value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                  />
+                </div>
+
+                {externalUrl && (
+                  <div className="rpa-mappings-box glass-subcard" style={{ padding: '16px', borderRadius: '12px' }}>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '12px' }}>Mapeamento de Campos (Seletor CSS → Dado):</h4>
+                    {automationMappings.map((row, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="input-control select-sm"
+                          placeholder="Seletor CSS (ex: #cpf-input)"
+                          value={row.css_selector}
+                          onChange={(e) => handleMappingChange(idx, 'css_selector', e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+
+                        <select
+                          className="input-control select-control select-sm"
+                          value={row.source_field}
+                          onChange={(e) => handleMappingChange(idx, 'source_field', e.target.value)}
+                          style={{ flex: 1 }}
+                        >
+                          {availableSourceFields.map((sf, i) => (
+                            <option key={i} value={sf}>{sf}</option>
+                          ))}
+                        </select>
+
+                        <button type="button" className="btn-icon danger" onClick={() => removeMappingRow(idx)} style={{ padding: '6px' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+
+                    <button type="button" className="btn secondary" onClick={addMappingRow} style={{ marginTop: '8px' }}>
+                      <Plus size={16} /> Adicionar Mapeamento
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button type="submit" className="btn primary submit-btn" disabled={loading} style={{ marginTop: '28px', width: '100%', padding: '14px', justifyContent: 'center' }}>
+              {loading ? 'Salvando...' : editingServiceId ? <><Edit3 size={20} /> Salvar Alterações no Serviço</> : <><CheckCircle2 size={20} /> Concluir e Salvar Serviço</>}
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* Templates Modal */}
       {showTemplatesModal && (

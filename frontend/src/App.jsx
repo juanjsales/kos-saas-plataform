@@ -268,7 +268,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`}
                   onClick={() => setActiveTab('services')}
                 >
-                  <Layers size={18} /> 3. Cadastrar Serviços
+                  <Layers size={18} /> 3. Serviços
                 </button>
               )}
 
