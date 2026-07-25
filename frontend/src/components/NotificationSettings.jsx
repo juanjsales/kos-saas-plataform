@@ -256,17 +256,9 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className="badge" style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 10px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--primary-accent)', borderRadius: '20px' }}>
-            {completionType === 'document_delivery' ? '📄 Documento (OCR)' :
-             completionType === 'appointment' ? '📅 Agendamento' :
-             completionType === 'pix_payment' ? '💳 PIX' : '📝 Personalizado'}
+          <span className="badge" style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 10px', background: ocrEnabled ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.12)', color: ocrEnabled ? '#10b981' : 'var(--text-muted)', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Scan size={12} /> {ocrEnabled ? 'OCR Ativo' : 'OCR Desativado'}
           </span>
-
-          {ocrEnabled && (
-            <span className="badge" style={{ fontSize: '0.75rem', fontWeight: '700', padding: '4px 8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Scan size={12} /> OCR Ativo
-            </span>
-          )}
 
           {isExpanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
         </div>
@@ -311,6 +303,7 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                       checked={ocrFields.includes(f.key)}
                       onChange={() => handleToggleOcrField(f.key)}
                     />
+                    <span>{f.label}</span>
                   </label>
                 ))}
               </div>
