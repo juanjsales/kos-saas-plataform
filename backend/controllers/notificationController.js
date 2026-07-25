@@ -47,11 +47,15 @@ export async function upsertNotificationRule(req, res) {
 
     if (error) throw error;
 
-    // Sync confirmation_template in services table for status_completed
+    // Sync confirmation_template, completion_type and confirmation_schema in services table for status_completed
     if (trigger_event === 'status_completed') {
+      const serviceUpdate = { confirmation_template: template_body };
+      if (req.body.completion_type) serviceUpdate.completion_type = req.body.completion_type;
+      if (req.body.confirmation_schema) serviceUpdate.confirmation_schema = req.body.confirmation_schema;
+
       await supabase
         .from('services')
-        .update({ confirmation_template: template_body })
+        .update(serviceUpdate)
         .eq('id', service_id)
         .catch(e => console.error('Error syncing service confirmation_template:', e));
     }

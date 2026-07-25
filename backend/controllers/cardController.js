@@ -156,30 +156,10 @@ export async function confirmCard(req, res) {
       return res.status(400).json({ error: error?.message || 'Card not found' });
     }
 
-    // 2. Format & send confirmation message via WhatsApp
-    const contactPhone = card.contacts?.phone;
-    const template = card.services?.confirmation_template || 
-      'Olá {contact_name}, seu agendamento para {service_title} foi confirmado com sucesso!';
-
-    if (contactPhone) {
-      const templateVars = {
-        card_id: card.id,
-        contact_name: card.contacts?.name || 'Cliente',
-        service_title: card.services?.title || 'Serviço',
-        confirmed_at: new Date(now).toLocaleDateString(),
-        status: card.status,
-        ...(card.collected_data || {})
-      };
-
-      const finalMessageText = interpolateTemplate(template, templateVars);
-      console.log(`[Card Confirmation] Dispatching WhatsApp confirmation message to ${contactPhone}: "${finalMessageText}"`);
-
-      try {
-        await sendWhatsAppMessage(contactPhone, finalMessageText, card.tenant_id);
-      } catch (err) {
-        console.error('Failed sending WhatsApp confirmation message:', err);
-      }
-    }
+    // 2. Trigger notification via unified triggerCardNotification (prevents duplicate dispatches)
+    triggerCardNotification(card.id, 'status_completed').catch(err => {
+      console.error('Async notification error on card confirmation:', err);
+    });
 
     return res.json(card);
   } catch (err) {

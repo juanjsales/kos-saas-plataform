@@ -423,10 +423,10 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                 )}
               </div>
 
-              {/* Booking & Appointment Metadata Fields */}
+              {/* Booking, Appointment & PIX Metadata Fields */}
               <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px', borderRadius: '10px' }}>
                 <h4 style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '10px', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FileText size={16} /> Dados do Comprovante de Agendamento Extraídos:
+                  <FileText size={16} /> Dados de Finalização do Atendimento:
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
@@ -440,7 +440,7 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                     />
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📍 Local do Agendamento</label>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📍 Local do Atendimento</label>
                     <input
                       type="text"
                       className="input-control select-sm"
@@ -450,7 +450,7 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                     />
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data do Agendamento</label>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data</label>
                     <input
                       type="text"
                       className="input-control select-sm"
@@ -467,6 +467,16 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                       placeholder="Ex: 14:30"
                       value={metadata.appointment_time || ''}
                       onChange={(e) => setMetadata({ ...metadata, appointment_time: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>💰 Valor Total (R$)</label>
+                    <input
+                      type="text"
+                      className="input-control select-sm"
+                      placeholder="Ex: 150,00"
+                      value={metadata.total_value || ''}
+                      onChange={(e) => setMetadata({ ...metadata, total_value: e.target.value })}
                     />
                   </div>
                 </div>
