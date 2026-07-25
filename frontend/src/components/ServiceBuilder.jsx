@@ -489,7 +489,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
             </button>
           </div>
 
-          {/* 4-Tab Navigation Bar */}
+          {/* 2-Tab Navigation Bar */}
           <div className="nocode-tabs-bar glass-subcard" style={{ display: 'flex', gap: '8px', padding: '6px', marginBottom: '24px', borderRadius: '12px' }}>
             <button
               type="button"
@@ -501,18 +501,10 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
 
             <button
               type="button"
-              className={`nocode-tab ${activeTab === 'confirmation' ? 'active' : ''}`}
-              onClick={() => setActiveTab('confirmation')}
-            >
-              <CheckCircle2 size={18} /> 2. Modal de Conclusão
-            </button>
-
-            <button
-              type="button"
               className={`nocode-tab ${activeTab === 'rpa' ? 'active' : ''}`}
               onClick={() => setActiveTab('rpa')}
             >
-              <Bot size={18} /> 3. Robô RPA (Opcional)
+              <Bot size={18} /> 2. Robô RPA (Opcional)
             </button>
           </div>
 
@@ -636,69 +628,7 @@ export function ServiceBuilder({ tenantId, apiBaseUrl }) {
               </div>
             )}
 
-            {/* Tab 2: Confirmation Modal Settings */}
-            {activeTab === 'confirmation' && (
-              <div className="tab-pane">
-                <div className="section-header" style={{ marginBottom: '16px' }}>
-                  <h3><CheckCircle2 size={20} className="accent-icon" /> Modelo do Modal de Finalização do Atendimento</h3>
-                  <p>Escolha qual formato de dados o atendente deve preencher ao concluir um pedido deste serviço.</p>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label" style={{ fontWeight: '700' }}>Selecione o Formato de Conclusão:</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '8px' }}>
-                    <div
-                      className={`glass-subcard ${completionType === 'document_delivery' ? 'active-rule' : ''}`}
-                      onClick={() => setCompletionType('document_delivery')}
-                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'document_delivery' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-                    >
-                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📄 Entrega de Documento / PDF</h4>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige upload de arquivo PDF/Foto + OCR automático de número de protocolo.</p>
-                    </div>
-
-                    <div
-                      className={`glass-subcard ${completionType === 'appointment' ? 'active-rule' : ''}`}
-                      onClick={() => setCompletionType('appointment')}
-                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'appointment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-                    >
-                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📅 Agendamento de Atendimento</h4>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige preenchimento de Data, Hora e Local do agendamento.</p>
-                    </div>
-
-                    <div
-                      className={`glass-subcard ${completionType === 'pix_payment' ? 'active-rule' : ''}`}
-                      onClick={() => setCompletionType('pix_payment')}
-                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'pix_payment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-                    >
-                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>💳 Cobrança / Código PIX</h4>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Exige preenchimento do Valor Total (R$) e da chave de pagamento.</p>
-                    </div>
-
-                    <div
-                      className={`glass-subcard ${completionType === 'identity' ? 'active-rule' : ''}`}
-                      onClick={() => setCompletionType('identity')}
-                      style={{ padding: '16px', borderRadius: '12px', cursor: 'pointer', border: completionType === 'identity' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-                    >
-                      <h4 style={{ fontSize: '0.9rem', marginBottom: '4px' }}>📝 Personalizado / Padrão</h4>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Utiliza as perguntas customizadas cadastradas no serviço.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700' }}>Texto Padrão da Mensagem de Finalização:</label>
-                  <textarea
-                    className="input-control textarea-control"
-                    placeholder="Ex: Olá {contact_name}, seu atendimento de {service_title} foi concluído com sucesso!"
-                    value={confirmationTemplate}
-                    onChange={(e) => setConfirmationTemplate(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Tab 3: RPA Automation */}
+            {/* Tab 2: RPA Automation */}
             {activeTab === 'rpa' && (
               <div className="tab-pane">
                 <div className="section-header" style={{ marginBottom: '16px' }}>

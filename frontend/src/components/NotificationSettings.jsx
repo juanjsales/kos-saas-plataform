@@ -311,62 +311,13 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                       checked={ocrFields.includes(f.key)}
                       onChange={() => handleToggleOcrField(f.key)}
                     />
-                    <span>{f.label}</span>
                   </label>
                 ))}
               </div>
             )}
           </div>
 
-          {/* SECTION 2: COMPLETION MODAL FORMAT SELECTION */}
-          <div className="glass-subcard" style={{ padding: '18px', marginBottom: '24px', borderRadius: '14px' }}>
-            <h4 style={{ fontSize: '0.92rem', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--secondary-accent)' }}>
-              <CheckCircle size={18} /> 🏁 Modelo do Modal de Finalização do Atendimento
-            </h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              Escolha qual formato de formulário o atendente verá no Kanban ao concluir este serviço:
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-              <div
-                className={`glass-subcard ${completionType === 'document_delivery' ? 'active-rule' : ''}`}
-                onClick={() => setCompletionType('document_delivery')}
-                style={{ padding: '14px', borderRadius: '10px', cursor: 'pointer', border: completionType === 'document_delivery' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-              >
-                <h5 style={{ fontSize: '0.85rem', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '6px' }}><FileText size={14} /> 📄 PDF / Foto (OCR)</h5>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Exige upload e protocolo.</p>
-              </div>
-
-              <div
-                className={`glass-subcard ${completionType === 'appointment' ? 'active-rule' : ''}`}
-                onClick={() => setCompletionType('appointment')}
-                style={{ padding: '14px', borderRadius: '10px', cursor: 'pointer', border: completionType === 'appointment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-              >
-                <h5 style={{ fontSize: '0.85rem', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> 📅 Agendamento</h5>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Data, Hora e Local.</p>
-              </div>
-
-              <div
-                className={`glass-subcard ${completionType === 'pix_payment' ? 'active-rule' : ''}`}
-                onClick={() => setCompletionType('pix_payment')}
-                style={{ padding: '14px', borderRadius: '10px', cursor: 'pointer', border: completionType === 'pix_payment' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-              >
-                <h5 style={{ fontSize: '0.85rem', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={14} /> 💳 Cobrança PIX</h5>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Valor Total e Chave.</p>
-              </div>
-
-              <div
-                className={`glass-subcard ${completionType === 'identity' ? 'active-rule' : ''}`}
-                onClick={() => setCompletionType('identity')}
-                style={{ padding: '14px', borderRadius: '10px', cursor: 'pointer', border: completionType === 'identity' ? '2px solid var(--primary-accent)' : '1px solid var(--border-light)' }}
-              >
-                <h5 style={{ fontSize: '0.85rem', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={14} /> 📝 Personalizado</h5>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Perguntas livres.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 3: MENSAGENS DAS ETAPAS DO WHATSAPP */}
+          {/* SECTION 2: MENSAGENS DAS ETAPAS DO WHATSAPP */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* 1. Novo Pedido */}
             <div className="rule-card glass-subcard" style={{ padding: '16px', borderRadius: '12px' }}>
