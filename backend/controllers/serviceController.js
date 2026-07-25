@@ -54,7 +54,7 @@ export async function createService(req, res) {
 export async function updateService(req, res) {
   try {
     const { id } = req.params;
-    const { title, description, completion_type, confirmation_template, confirmation_schema, external_url, automation_mapping, custom_fields } = req.body;
+    const { title, description, completion_type, confirmation_template, confirmation_schema, ocr_enabled, ocr_fields, external_url, automation_mapping, custom_fields } = req.body;
 
     if (!id || !title) {
       return res.status(400).json({ error: 'service id and title are required' });
@@ -71,6 +71,8 @@ export async function updateService(req, res) {
 
     if (confirmation_template !== undefined) updatePayload.confirmation_template = confirmation_template;
     if (confirmation_schema !== undefined) updatePayload.confirmation_schema = confirmation_schema;
+    if (ocr_enabled !== undefined) updatePayload.ocr_enabled = ocr_enabled;
+    if (ocr_fields !== undefined) updatePayload.ocr_fields = ocr_fields;
 
     // 1. Update service details
     const { data: service, error: updateErr } = await supabase

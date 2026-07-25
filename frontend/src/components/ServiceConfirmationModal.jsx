@@ -130,9 +130,12 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
     return message;
   };
 
+  const [ocrSuccess, setOcrSuccess] = useState(false);
+
   // OCR Attachment Analysis
   const autoAnalyzeFile = async (fileToAnalyze) => {
     setAnalyzing(true);
+    setOcrSuccess(false);
     const formData = new FormData();
     formData.append('document', fileToAnalyze);
     formData.append('tenant_id', tenantId);
@@ -148,14 +151,19 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
         setAttachmentUrl(data.attachment_url);
         
         const ext = data.attachment_metadata || {};
-        setMetadata(prev => ({
-          ...prev,
-          document_number: ext.document_number || prev.document_number,
-          rg_number: ext.rg_number || prev.rg_number,
-          cpf: ext.cpf || prev.cpf,
-          full_name: ext.full_name || card?.contacts?.name || prev.full_name,
-          total_value: ext.total_value || prev.total_value
-        }));
+        const isOcrEnabled = targetService?.ocr_enabled !== false;
+
+        if (isOcrEnabled) {
+          setMetadata(prev => ({
+            ...prev,
+            document_number: ext.document_number || prev.document_number,
+            rg_number: ext.rg_number || prev.rg_number,
+            cpf: ext.cpf || prev.cpf,
+            full_name: ext.full_name || card?.contacts?.name || prev.full_name,
+            total_value: ext.total_value || prev.total_value
+          }));
+          setOcrSuccess(true);
+        }
       }
     } catch (err) {
       console.error('Error analyzing document:', err);
@@ -419,6 +427,12 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                 {attachmentUrl && (
                   <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--primary-accent)' }}>
                     <FileText size={12} /> <a href={attachmentUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Ver comprovante salvo</a>
+                  </div>
+                )}
+
+                {ocrSuccess && (
+                  <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontSize: '0.78rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✨ Leitura OCR concluída com sucesso! Os campos abaixo foram preenchidos automaticamente.
                   </div>
                 )}
               </div>
