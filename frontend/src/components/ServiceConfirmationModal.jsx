@@ -311,7 +311,7 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
             {/* Left Side: Form Inputs, Questions & OCR Attachment */}
             <div className="confirmation-form-side">
               
-              {/* Rich Custom Fields Checklist */}
+              {/* 1. SECTION: CUSTOM FIELDS (IF ANY) */}
               {customFields.length > 0 && (
                 <div className="custom-fields-box glass-subcard" style={{ padding: '16px', marginBottom: '16px' }}>
                   <h4 style={{ fontSize: '0.85rem', marginBottom: '12px', color: 'var(--primary-accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -389,10 +389,100 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                 </div>
               )}
 
-              {/* Document / Receipt Upload Box (Optional OCR) */}
+              {/* 2. SECTION: ADAPTIVE METADATA FIELDS (BASED ON COMPLETION_TYPE) */}
+              <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px', borderRadius: '10px' }}>
+                <h4 style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '10px', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {completionType === 'appointment' ? <><Calendar size={16} /> Dados do Agendamento:</> :
+                   completionType === 'pix_payment' ? <><CreditCard size={16} /> Dados do Pagamento / PIX:</> :
+                   completionType === 'document_delivery' ? <><FileText size={16} /> Dados do Documento Emitido:</> :
+                   <><FileText size={16} /> Dados de Finalização:</>}
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {/* Protocol Field for Document, Appointment or PIX */}
+                  {(completionType === 'document_delivery' || completionType === 'appointment' || completionType === 'pix_payment') && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>📑 Nº do Protocolo / Recibo</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: PROT-98124"
+                        value={metadata.protocol_number || metadata.document_number || ''}
+                        onChange={(e) => setMetadata({ ...metadata, protocol_number: e.target.value, document_number: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  {/* Appointment Specific Fields */}
+                  {completionType === 'appointment' && (
+                    <>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>📍 Local do Agendamento</label>
+                        <input
+                          type="text"
+                          className="input-control select-sm"
+                          placeholder="Ex: Posto Central / Sala 02"
+                          value={metadata.appointment_location || ''}
+                          onChange={(e) => setMetadata({ ...metadata, appointment_location: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data do Agendamento</label>
+                        <input
+                          type="text"
+                          className="input-control select-sm"
+                          placeholder="Ex: 25/08/2026"
+                          value={metadata.appointment_date || metadata.document_date || ''}
+                          onChange={(e) => setMetadata({ ...metadata, appointment_date: e.target.value, document_date: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>⏰ Horário</label>
+                        <input
+                          type="text"
+                          className="input-control select-sm"
+                          placeholder="Ex: 14:30"
+                          value={metadata.appointment_time || ''}
+                          onChange={(e) => setMetadata({ ...metadata, appointment_time: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* PIX Specific Fields */}
+                  {completionType === 'pix_payment' && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>💰 Valor Total (R$)</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: 150,00"
+                        value={metadata.total_value || ''}
+                        onChange={(e) => setMetadata({ ...metadata, total_value: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  {/* Document Delivery Specific Fields */}
+                  {completionType === 'document_delivery' && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data de Emissão</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: 25/08/2026"
+                        value={metadata.document_date || metadata.appointment_date || ''}
+                        onChange={(e) => setMetadata({ ...metadata, document_date: e.target.value, appointment_date: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. SECTION: DOCUMENT UPLOAD DROPZONE (FOR DOCUMENT DELIVERY, APPOINTMENT OR PIX COMPROVANTE) */}
               <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px' }}>
                 <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <Upload size={14} className="accent-icon" /> Anexo ou Comprovante (Opcional):
+                  <Upload size={14} className="accent-icon" /> Anexo ou Comprovante {completionType === 'document_delivery' ? '(Recomendado PDF/Foto)' : '(Opcional)'}:
                 </label>
                 
                 <div
@@ -435,65 +525,6 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                     ✨ Leitura OCR concluída com sucesso! Os campos abaixo foram preenchidos automaticamente.
                   </div>
                 )}
-              </div>
-
-              {/* Booking, Appointment & PIX Metadata Fields */}
-              <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px', borderRadius: '10px' }}>
-                <h4 style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '10px', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FileText size={16} /> Dados de Finalização do Atendimento:
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📑 Nº do Protocolo / Agendamento</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: PROT-98124"
-                      value={metadata.protocol_number || metadata.document_number || ''}
-                      onChange={(e) => setMetadata({ ...metadata, protocol_number: e.target.value, document_number: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📍 Local do Atendimento</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: Posto Central"
-                      value={metadata.appointment_location || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_location: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 25/08/2026"
-                      value={metadata.appointment_date || metadata.document_date || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_date: e.target.value, document_date: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>⏰ Horário</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 14:30"
-                      value={metadata.appointment_time || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_time: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>💰 Valor Total (R$)</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 150,00"
-                      value={metadata.total_value || ''}
-                      onChange={(e) => setMetadata({ ...metadata, total_value: e.target.value })}
-                    />
-                  </div>
-                </div>
               </div>
 
               {/* Notes / Summary */}
