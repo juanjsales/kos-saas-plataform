@@ -172,9 +172,16 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
     }
   };
 
+  const isPreviewMode = card?.id === 'preview-card-id';
+
   // Send WhatsApp Notification Only (without completing card)
   const handleConfirmWhatsAppOnly = async () => {
     if (!isFormValid) return;
+    if (isPreviewMode) {
+      alert('✨ [Modo de Prévia] Teste bem-sucedido! A notificação do WhatsApp foi simulada com sucesso.');
+      onClose();
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`${apiBaseUrl}/api/cards/${card.id}/confirm`, {
@@ -211,6 +218,11 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
   const handleCompleteCardAndNotify = async (e) => {
     if (e) e.preventDefault();
     if (!isFormValid) return;
+    if (isPreviewMode) {
+      alert('✨ [Modo de Prévia] Teste bem-sucedido! A conclusão do pedido e o envio da mensagem foram simulados com sucesso.');
+      onClose();
+      return;
+    }
     setSubmitting(true);
 
     try {

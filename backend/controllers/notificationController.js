@@ -47,6 +47,15 @@ export async function upsertNotificationRule(req, res) {
 
     if (error) throw error;
 
+    // Sync confirmation_template in services table for status_completed
+    if (trigger_event === 'status_completed') {
+      await supabase
+        .from('services')
+        .update({ confirmation_template: template_body })
+        .eq('id', service_id)
+        .catch(e => console.error('Error syncing service confirmation_template:', e));
+    }
+
     return res.status(200).json(rule);
   } catch (err) {
     return res.status(500).json({ error: err.message });

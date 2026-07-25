@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Save, Power, CheckCircle, Info } from 'lucide-react';
+import { Bell, Save, Power, CheckCircle, Info, Eye } from 'lucide-react';
+import { ServiceConfirmationModal } from './ServiceConfirmationModal';
 
 export function NotificationSettings({ tenantId, apiBaseUrl }) {
   const [services, setServices] = useState([]);
@@ -7,12 +8,13 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [previewCard, setPreviewCard] = useState(null);
 
   // Available triggers
   const triggers = [
     { event: 'card_created', label: '1. Quando um Novo Pedido for Aberto' },
     { event: 'status_in_progress', label: '2. Quando o Pedido for para: Em Andamento' },
-    { event: 'status_completed', label: '3. Quando o Pedido for para: Concluído' },
+    { event: 'status_completed', label: '3. Quando o Pedido for para: Concluído (Confirmação do Atendimento)' },
     { event: 'status_cancelled', label: '4. Quando o Pedido for para: Cancelado' }
   ];
 
@@ -60,6 +62,23 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
     };
   };
 
+  const currentService = services.find(s => s.id === selectedServiceId);
+
+  const handleOpenPreviewModal = (templateBody) => {
+    const mockCard = {
+      id: 'preview-card-id',
+      service_id: selectedServiceId,
+      status: 'in_progress',
+      contacts: { name: 'João Silva (Cliente Exemplo)', phone: '5511999999999' },
+      services: {
+        title: currentService?.title || 'Serviço Selecionado',
+        confirmation_template: templateBody || currentService?.confirmation_template || 'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!'
+      },
+      collected_data: { 'Exemplo': 'Teste de preenchimento' }
+    };
+    setPreviewCard(mockCard);
+  };
+
   const handleSaveRule = async (triggerEvent, is_active, template_body) => {
     setLoading(true);
     setMessage(null);
@@ -81,8 +100,9 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
       });
 
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Mensagem salva com sucesso!' });
+        setMessage({ type: 'success', text: 'Mensagem e regra salvas e sincronizadas com sucesso!' });
         fetchRules(selectedServiceId);
+        fetchServices();
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.error });
@@ -97,8 +117,8 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
   return (
     <div className="notification-settings-container glass-card">
       <div className="section-header">
-        <h2><Bell size={24} className="accent-icon" /> Lembretes e Avisos Automáticos pelo WhatsApp</h2>
-        <p>Escreva a mensagem que o cliente vai receber automaticamente no WhatsApp em cada etapa do trabalho.</p>
+        <h2><Bell size={24} className="accent-icon" /> Lembretes, Avisos e Confirmação de Atendimento</h2>
+        <p>Configure e teste as mensagens automáticas do WhatsApp para cada etapa do atendimento da sua empresa.</p>
       </div>
 
       {message && (
@@ -142,19 +162,31 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
           return (
             <RuleCard
               key={event}
+              event={event}
               label={label}
               rule={rule}
               onSave={(isActive, body) => handleSaveRule(event, isActive, body)}
+              onPreview={handleOpenPreviewModal}
               loading={loading}
             />
           );
         })}
       </div>
+
+      {/* Confirmation Modal Preview */}
+      {previewCard && (
+        <ServiceConfirmationModal
+          card={previewCard}
+          tenantId={tenantId}
+          apiBaseUrl={apiBaseUrl}
+          onClose={() => setPreviewCard(null)}
+        />
+      )}
     </div>
   );
 }
 
-function RuleCard({ label, rule, onSave, loading }) {
+function RuleCard({ event, label, rule, onSave, onPreview, loading }) {
   const [isActive, setIsActive] = useState(rule.is_active || false);
   const [templateBody, setTemplateBody] = useState(rule.template_body || '');
 
@@ -193,15 +225,28 @@ function RuleCard({ label, rule, onSave, loading }) {
         />
       </div>
 
-      <button
-        type="button"
-        className="btn primary save-rule-btn"
-        disabled={loading}
-        onClick={() => onSave(isActive, templateBody)}
-        style={{ padding: '8px 16px' }}
-      >
-        <Save size={16} /> Salvar Esta Mensagem
-      </button>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <button
+          type="button"
+          className="btn primary save-rule-btn"
+          disabled={loading}
+          onClick={() => onSave(isActive, templateBody)}
+          style={{ padding: '8px 16px' }}
+        >
+          <Save size={16} /> Salvar Esta Mensagem
+        </button>
+
+        {event === 'status_completed' && (
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => onPreview && onPreview(templateBody)}
+            style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Eye size={16} /> 👁️ Testar & Ver Prévia do Modal de Confirmação
+          </button>
+        )}
+      </div>
     </div>
   );
 }
