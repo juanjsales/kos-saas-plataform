@@ -159,5 +159,18 @@ export function AuthProvider({ children, apiBaseUrl }) {
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    return {
+      user: null,
+      profile: null,
+      tenant: null,
+      loading: false,
+      login: async () => {},
+      logout: async () => {},
+      resetPassword: async () => {},
+      isAuthenticated: false
+    };
+  }
+  return context;
 }

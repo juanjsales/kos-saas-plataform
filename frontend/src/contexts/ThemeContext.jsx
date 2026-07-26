@@ -160,5 +160,21 @@ export function ThemeProvider({ children, apiBaseUrl, tenantId: propsTenantId, u
 }
 
 export function useTheme() {
-  return useContext(ThemeContext);
+  const context = useContext(ThemeContext);
+  if (!context) {
+    return {
+      tenantName: 'KOS System',
+      tenantLogo: null,
+      tenantBrandColor: '#6366f1',
+      themeMode: 'light',
+      accentColor: '#6366f1',
+      rgbColor1: '#6366f1',
+      rgbColor2: '#10b981',
+      kanbanDensity: 'comfortable',
+      updatePreferences: () => {},
+      updateTenantBranding: () => {},
+      userRole: 'tenant_operator'
+    };
+  }
+  return context;
 }
