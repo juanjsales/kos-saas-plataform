@@ -1,3 +1,11 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  MessageSquare, Send, CalendarPlus, User, Phone, CheckCircle, RefreshCw, Search,
+  Paperclip, CheckCheck, Sparkles, Filter, Bot, ChevronRight, X, Image, FileText,
+  Clock, AlertCircle, Zap, Tag, ChevronLeft, Check, Edit3, ArrowRight, CornerDownLeft
+} from 'lucide-react';
+import { supabase } from '../config/supabaseClient';
+
 // Helper function for phone formatting & deduplication
 const formatPhone = (phoneRaw) => {
   if (!phoneRaw) return '';
