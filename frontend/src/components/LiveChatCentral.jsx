@@ -1,10 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  MessageSquare, Send, CalendarPlus, User, Phone, CheckCircle, RefreshCw, Search,
-  Paperclip, CheckCheck, Sparkles, Filter, Bot, ChevronRight, X, Image, FileText,
-  Clock, AlertCircle, Zap, Tag, ChevronLeft, Check, Edit3, ArrowRight, CornerDownLeft
-} from 'lucide-react';
-import { supabase } from '../config/supabaseClient';
+// Helper function for phone formatting & deduplication
+const formatPhone = (phoneRaw) => {
+  if (!phoneRaw) return '';
+  const clean = String(phoneRaw).replace(/\D/g, '');
+  if (clean.length === 13 && clean.startsWith('55')) {
+    return `+55 (${clean.slice(2,4)}) ${clean.slice(4,9)}-${clean.slice(9)}`;
+  }
+  if (clean.length === 12 && clean.startsWith('55')) {
+    return `+55 (${clean.slice(2,4)}) ${clean.slice(4,8)}-${clean.slice(8)}`;
+  }
+  if (clean.length === 11) {
+    return `(${clean.slice(0,2)}) ${clean.slice(2,7)}-${clean.slice(7)}`;
+  }
+  return clean || phoneRaw;
+};
+
+const getContactDisplayInfo = (chat) => {
+  if (!chat) return { title: '', subtext: '', initial: 'C', phoneFormatted: '' };
+  const phoneClean = (chat.id || '').replace('@s.whatsapp.net', '').replace(/\D/g, '');
+  const phoneFormatted = formatPhone(phoneClean);
+  
+  const rawName = (chat.contact_name || '').trim();
+  const nameClean = rawName.replace(/\D/g, '');
+  const isNameOnlyPhone = !rawName || nameClean === phoneClean || rawName === phoneClean;
+
+  const title = isNameOnlyPhone ? phoneFormatted : rawName;
+  const subtext = isNameOnlyPhone ? 'WhatsApp Conectado' : `${phoneFormatted} • WhatsApp Conectado`;
+  const initial = isNameOnlyPhone ? '📱' : rawName.charAt(0).toUpperCase();
+
+  return { title, subtext, initial, phoneFormatted, isNameOnlyPhone };
+};
 
 export function LiveChatCentral({ tenantId, apiBaseUrl }) {
   const [chats, setChats] = useState([]);
@@ -301,47 +325,47 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
 
   return (
     <div className="wa-web-container" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 110px)' }}>
-      <div className="wa-web-app" style={{ display: 'flex', width: '100%', flex: 1, borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+      <div className="wa-web-app glass-card" style={{ display: 'flex', width: '100%', flex: 1, borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-lg)' }}>
         
         {/* LEFT PANEL: CONTACTS LIST (WHATSAPP WEB SIDEBAR) */}
-        <div className="wa-sidebar" style={{ width: '340px', minWidth: '300px', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-light)', background: 'var(--bg-subcard)' }}>
+        <div className="wa-sidebar" style={{ width: '340px', minWidth: '300px', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-light)', background: '#ffffff' }}>
           {/* Header Bar */}
-          <div className="wa-sidebar-header" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', background: 'rgba(15, 23, 42, 0.3)' }}>
-            <div className="wa-my-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className="wa-avatar-circle my-avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #10b981)', color: '#fff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem' }}>
+          <div className="wa-sidebar-header" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', background: '#f8fafc' }}>
+            <div className="wa-my-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="wa-avatar-circle my-avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.88rem', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
                 <span>KOS</span>
               </div>
-              <span className="wa-my-name" style={{ fontWeight: '700', fontSize: '0.92rem' }}>Central WhatsApp</span>
+              <span className="wa-my-name" style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>Central WhatsApp</span>
             </div>
 
             <div className="wa-header-actions" style={{ display: 'flex', gap: '8px' }}>
-              <button className="wa-icon-btn" onClick={fetchChats} title="Atualizar Conversas" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px', borderRadius: '8px' }}>
+              <button className="btn-icon" onClick={fetchChats} title="Atualizar Conversas" style={{ padding: '8px', borderRadius: '8px' }}>
                 <RefreshCw size={18} />
               </button>
             </div>
           </div>
 
           {/* Search Box Bar & Filter Tabs */}
-          <div className="wa-search-bar" style={{ padding: '12px 16px 8px' }}>
-            <div className="wa-search-input-wrapper" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', borderRadius: '10px', padding: '8px 12px', border: '1px solid var(--border-light)' }}>
-              <Search size={16} className="wa-search-icon" style={{ color: 'var(--text-muted)', marginRight: '8px' }} />
+          <div className="wa-search-bar" style={{ padding: '14px 16px 10px', background: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
+            <div className="wa-search-input-wrapper" style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: '12px', padding: '10px 14px', border: '1.5px solid #e2e8f0' }}>
+              <Search size={18} className="wa-search-icon" style={{ color: '#64748b', marginRight: '10px' }} />
               <input
                 type="text"
-                placeholder="Pesquisar conversa..."
+                placeholder="Pesquisar por nome ou telefone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="wa-search-input"
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+                style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: '0.88rem', fontWeight: '600' }}
               />
             </div>
 
             {/* Quick Filter Pills */}
-            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               <button
                 type="button"
                 className={`filter-pill ${filterType === 'all' ? 'active' : ''}`}
                 onClick={() => setFilterType('all')}
-                style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', border: 'none', cursor: 'pointer', background: filterType === 'all' ? 'var(--primary-accent)' : 'rgba(255,255,255,0.06)', color: filterType === 'all' ? '#fff' : 'var(--text-muted)' }}
+                style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', background: filterType === 'all' ? '#4f46e5' : '#f1f5f9', color: filterType === 'all' ? '#ffffff' : '#64748b', transition: 'all 0.2s' }}
               >
                 Todas ({chats.length})
               </button>
@@ -349,7 +373,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                 type="button"
                 className={`filter-pill ${filterType === 'unread' ? 'active' : ''}`}
                 onClick={() => setFilterType('unread')}
-                style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', border: 'none', cursor: 'pointer', background: filterType === 'unread' ? 'var(--primary-accent)' : 'rgba(255,255,255,0.06)', color: filterType === 'unread' ? '#fff' : 'var(--text-muted)' }}
+                style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', background: filterType === 'unread' ? '#4f46e5' : '#f1f5f9', color: filterType === 'unread' ? '#ffffff' : '#64748b', transition: 'all 0.2s' }}
               >
                 Não Lidas
               </button>
@@ -357,11 +381,10 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
           </div>
 
           {/* Contact List */}
-          <div className="wa-chats-list" style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          <div className="wa-chats-list" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {filteredChats.map((chat) => {
               const isSelected = selectedChat?.id === chat.id;
-              const phoneClean = chat.id.replace('@s.whatsapp.net', '');
-              const initial = chat.contact_name ? chat.contact_name.charAt(0).toUpperCase() : 'C';
+              const info = getContactDisplayInfo(chat);
 
               return (
                 <div
@@ -369,36 +392,36 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                   className={`wa-chat-item ${isSelected ? 'active' : ''}`}
                   onClick={() => handleSelectChat(chat)}
                   style={{
-                    padding: '12px 16px',
+                    padding: '14px 18px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
+                    gap: '14px',
                     cursor: 'pointer',
-                    background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                    borderLeft: isSelected ? '4px solid var(--primary-accent)' : '4px solid transparent',
-                    transition: 'background 0.2s'
+                    background: isSelected ? '#f1f5f9' : '#ffffff',
+                    borderLeft: isSelected ? '4px solid #4f46e5' : '4px solid transparent',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <div className="wa-avatar-circle" style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                    {initial}
+                  <div className="wa-avatar-circle" style={{ width: '44px', height: '44px', borderRadius: '50%', background: isSelected ? 'linear-gradient(135deg, #4f46e5, #10b981)' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.05rem', boxShadow: isSelected ? '0 4px 10px rgba(79, 70, 229, 0.2)' : 'none' }}>
+                    {info.initial}
                   </div>
 
                   <div className="wa-chat-details" style={{ flex: 1, minWidth: 0 }}>
                     <div className="wa-chat-top-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span className="wa-chat-name" style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {chat.contact_name || phoneClean}
+                      <span className="wa-chat-name" style={{ fontWeight: '800', fontSize: '0.92rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {info.title}
                       </span>
-                      <span className="wa-chat-time" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span className="wa-chat-time" style={{ fontSize: '0.72rem', fontWeight: '600', color: '#64748b' }}>
                         {chat.updated_at ? new Date(chat.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hoje'}
                       </span>
                     </div>
 
                     <div className="wa-chat-bottom-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="wa-chat-preview" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        <Phone size={11} style={{ display: 'inline', marginRight: '4px' }} />
-                        {phoneClean}
+                      <span className="wa-chat-preview" style={{ fontSize: '0.8rem', fontWeight: '500', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <Phone size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                        {info.phoneFormatted}
                       </span>
-                      <span className="wa-unread-badge" style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', borderRadius: '10px', fontWeight: '700' }}>
+                      <span className="wa-unread-badge" style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '12px', fontWeight: '800' }}>
                         Ativo
                       </span>
                     </div>
@@ -408,58 +431,60 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
             })}
 
             {filteredChats.length === 0 && (
-              <div className="wa-empty-sidebar" style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <MessageSquare size={32} style={{ opacity: 0.4, marginBottom: '8px' }} />
-                <p style={{ fontSize: '0.85rem' }}>Nenhuma conversa encontrada.</p>
+              <div className="wa-empty-sidebar" style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                <MessageSquare size={36} style={{ opacity: 0.3, marginBottom: '10px' }} />
+                <p style={{ fontSize: '0.88rem', fontWeight: '600' }}>Nenhuma conversa encontrada.</p>
               </div>
             )}
           </div>
         </div>
 
         {/* MIDDLE PANEL: MAIN WHATSAPP CHAT THREAD */}
-        <div className="wa-chat-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-card)' }}>
+        <div className="wa-chat-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
           {selectedChat ? (
             <>
               {/* WhatsApp Web Chat Header */}
-              <div className="wa-chat-header" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', background: 'rgba(15, 23, 42, 0.3)' }}>
-                <div className="wa-contact-header-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="wa-avatar-circle" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981, #3b82f6)', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {selectedChat.contact_name ? selectedChat.contact_name.charAt(0).toUpperCase() : 'C'}
+              <div className="wa-chat-header" style={{ padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', background: '#ffffff', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+                <div className="wa-contact-header-info" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div className="wa-avatar-circle" style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
+                    {getContactDisplayInfo(selectedChat).initial}
                   </div>
                   <div>
-                    <h3 className="wa-contact-title" style={{ fontSize: '0.98rem', fontWeight: '800', margin: 0 }}>{selectedChat.contact_name}</h3>
-                    <span className="wa-contact-subtext" style={{ fontSize: '0.78rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 className="wa-contact-title" style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                      {getContactDisplayInfo(selectedChat).title}
+                    </h3>
+                    <span className="wa-contact-subtext" style={{ fontSize: '0.8rem', fontWeight: '700', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                       <span className="wa-online-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span>
-                      WhatsApp Online • {selectedChat.id.replace('@s.whatsapp.net', '')}
+                      {getContactDisplayInfo(selectedChat).subtext}
                     </span>
                   </div>
                 </div>
 
-                <div className="wa-chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="wa-chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <button
                     className="btn secondary"
                     onClick={() => setShowCustomerDrawer(!showCustomerDrawer)}
                     title="Informações do Cliente"
-                    style={{ fontSize: '0.78rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    style={{ fontSize: '0.85rem', padding: '8px 16px', borderRadius: '10px', fontWeight: '700', border: '1px solid #cbd5e1' }}
                   >
-                    <User size={14} />
+                    <User size={16} />
                     <span>{showCustomerDrawer ? 'Ocultar Painel' : 'Ver Dados'}</span>
                   </button>
 
                   <button
                     className="btn primary"
                     onClick={() => setShowConvertModal(true)}
-                    style={{ fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #6366f1, #10b981)' }}
+                    style={{ fontSize: '0.85rem', padding: '8px 18px', borderRadius: '10px', fontWeight: '800', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)' }}
                   >
-                    <CalendarPlus size={15} />
+                    <CalendarPlus size={16} />
                     <span>➕ Criar Atendimento</span>
                   </button>
                 </div>
               </div>
 
-              {/* WhatsApp Messages Area */}
-              <div className="wa-messages-area" ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(15, 23, 42, 0.15)' }}>
-                <div className="wa-encryption-banner" style={{ alignSelf: 'center', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '10px' }}>
+              {/* WhatsApp Messages Area (Authentic Light WhatsApp Wallpaper Canvas) */}
+              <div className="wa-messages-area" ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#efeae2', backgroundImage: 'radial-gradient(#cbd5e1 0.75px, transparent 0.75px)', backgroundSize: '16px 16px' }}>
+                <div className="wa-encryption-banner" style={{ alignSelf: 'center', background: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 18px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '700', color: '#475569', textAlign: 'center', marginBottom: '12px', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.05)' }}>
                   🔒 Mensagens protegidas com a criptografia oficial de ponta a ponta do WhatsApp.
                 </div>
 
@@ -476,21 +501,23 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                       <div
                         className={`wa-bubble ${isOutbound ? 'outbound-bubble' : 'inbound-bubble'}`}
                         style={{
-                          maxWidth: '75%',
-                          padding: '10px 14px',
-                          borderRadius: isOutbound ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                          background: isOutbound ? 'linear-gradient(135deg, #1e293b, #0f172a)' : 'rgba(30, 41, 59, 0.6)',
-                          border: isOutbound ? '1px solid var(--primary-accent)' : '1px solid var(--border-light)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                          color: '#fff'
+                          maxWidth: '70%',
+                          padding: '12px 16px',
+                          borderRadius: isOutbound ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          background: isOutbound ? '#d9fdd3' : '#ffffff',
+                          border: isOutbound ? '1px solid #c2eebe' : '1px solid #e9edef',
+                          boxShadow: '0 2px 6px rgba(11, 20, 26, 0.08)',
+                          color: '#111b21'
                         }}
                       >
-                        <div className="wa-msg-text" style={{ fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{msg.content}</div>
+                        <div className="wa-msg-text" style={{ fontSize: '0.92rem', fontWeight: '500', color: '#111b21', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                          {msg.content}
+                        </div>
 
-                        <div className="wa-msg-meta" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                          <span className="wa-msg-time" style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{timeFormatted}</span>
+                        <div className="wa-msg-meta" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+                          <span className="wa-msg-time" style={{ fontSize: '0.7rem', fontWeight: '600', color: '#667781' }}>{timeFormatted}</span>
                           {isOutbound && (
-                            <CheckCheck size={14} style={{ color: '#10b981' }} />
+                            <CheckCheck size={16} style={{ color: '#53bdeb' }} />
                           )}
                         </div>
                       </div>
@@ -500,30 +527,30 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
               </div>
 
               {/* QUICK REPLIES BAR (1-CLICK TEMPLATES) */}
-              <div className="quick-replies-bar" style={{ padding: '8px 16px', background: 'rgba(15, 23, 42, 0.4)', borderTop: '1px solid var(--border-light)', display: 'flex', gap: '8px', overflowX: 'auto' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                  <Zap size={13} style={{ color: '#f59e0b' }} /> Respostas Rápidas:
+              <div className="quick-replies-bar" style={{ padding: '10px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '10px', overflowX: 'auto', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                  <Zap size={15} style={{ color: '#f59e0b' }} /> Respostas Rápidas:
                 </span>
-                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Olá {contact_name}! Como posso te ajudar hoje?')} style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Olá {contact_name}! Como posso te ajudar hoje?')} style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   👋 Boas-vindas
                 </button>
-                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Nosso endereço é Posto Central, de Seg a Sex das 08h às 18h.')} style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Nosso endereço é Posto Central, de Seg a Sex das 08h às 18h.')} style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   📍 Localização
                 </button>
-                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Sua chave PIX para pagamento é 123.456.789-00.')} style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Sua chave PIX para pagamento é 123.456.789-00.')} style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   💳 Dados PIX
                 </button>
-                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Seu agendamento foi confirmado com sucesso!')} style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Seu agendamento foi confirmado com sucesso!')} style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   📅 Agendamento
                 </button>
-                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Seu pedido foi concluído com sucesso! Obrigado pelo contato!')} style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn secondary" onClick={() => handleQuickReply('Seu pedido foi concluído com sucesso! Obrigado pelo contato!')} style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   ✅ Concluído
                 </button>
               </div>
 
-              {/* WhatsApp Web Bottom Input Bar */}
-              <form onSubmit={handleSendMessage} className="wa-input-bar" style={{ padding: '12px 16px', background: 'var(--bg-subcard)', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button type="button" className="wa-input-icon-btn" title="Anexar Arquivo" onClick={() => setShowAttachmentModal(true)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px' }}>
+              {/* WhatsApp Web Bottom Input Bar (HIGH CONTRAST & CRISP READABILITY) */}
+              <form onSubmit={handleSendMessage} className="wa-input-bar" style={{ padding: '14px 20px', background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button type="button" className="btn-icon" title="Anexar Arquivo" onClick={() => setShowAttachmentModal(true)} style={{ padding: '10px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569' }}>
                   <Paperclip size={20} />
                 </button>
 
@@ -534,9 +561,9 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                   disabled={isAiLoading || !replyText.trim()}
                   onClick={handleAiRefineText}
                   title="Aprimorar estilo e pontuação do texto com IA"
-                  style={{ fontSize: '0.75rem', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary-accent)' }}
+                  style={{ fontSize: '0.8rem', fontWeight: '800', padding: '8px 14px', borderRadius: '10px', border: '1px solid #c7d2fe', background: '#eff6ff', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <Sparkles size={14} /> Refinar com IA
+                  <Sparkles size={16} /> Refinar com IA
                 </button>
 
                 <button
@@ -545,40 +572,51 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                   disabled={isAiLoading}
                   onClick={handleAiSuggestReply}
                   title="Sugerir resposta contextual baseada nas mensagens do cliente"
-                  style={{ fontSize: '0.75rem', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}
+                  style={{ fontSize: '0.8rem', fontWeight: '800', padding: '8px 14px', borderRadius: '10px', border: '1px solid #a7f3d0', background: '#ecfdf5', color: '#047857', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <Bot size={14} /> Sugerir Resposta
+                  <Bot size={16} /> Sugerir Resposta
                 </button>
 
                 <input
                   type="text"
                   className="wa-message-input"
-                  placeholder="Digite uma mensagem ou selecione uma resposta rápida..."
+                  placeholder="Digite uma mensagem ou escolha uma resposta rápida..."
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  style={{ flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: '10px', padding: '10px 14px', color: '#fff', outline: 'none', fontSize: '0.88rem' }}
+                  style={{
+                    flex: 1,
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '12px 18px',
+                    color: '#0f172a', // CRISP BOLD DARK FONT FOR PERFECT READABILITY!
+                    outline: 'none',
+                    fontSize: '0.92rem',
+                    fontWeight: '600',
+                    boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)'
+                  }}
                 />
 
                 <button
                   type="submit"
                   className="btn primary"
                   disabled={!replyText.trim() || isSending}
-                  style={{ padding: '10px 18px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                  style={{ padding: '12px 22px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)' }}
                 >
-                  <Send size={16} />
+                  <Send size={18} />
                 </button>
               </form>
             </>
           ) : (
             <div className="wa-no-chat-screen" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', textAlign: 'center' }}>
-              <div className="wa-welcome-box" style={{ maxWidth: '420px' }}>
-                <MessageSquare size={56} className="wa-welcome-icon" style={{ color: 'var(--primary-accent)', margin: '0 auto 16px', opacity: 0.8 }} />
-                <h2 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Central de Conversas KOS WhatsApp</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
-                  Selecione uma conversa na lista lateral para visualizar as mensagens, responder com IA e gerenciar os atendimentos no Kanban.
+              <div className="wa-welcome-box" style={{ maxWidth: '440px', padding: '32px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-md)' }}>
+                <MessageSquare size={60} className="wa-welcome-icon" style={{ color: '#4f46e5', margin: '0 auto 16px', opacity: 0.9 }} />
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>Central de Conversas KOS WhatsApp</h2>
+                <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '24px' }}>
+                  Selecione uma conversa na lista lateral para visualizar mensagens, usar assistente de IA e gerenciar os atendimentos no Kanban.
                 </p>
-                <div className="wa-secure-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '20px', fontSize: '0.78rem' }}>
-                  <Sparkles size={14} /> Criptografia & Sincronização em Tempo Real
+                <div className="wa-secure-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 18px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '700' }}>
+                  <Sparkles size={16} /> Criptografia & Sincronização em Tempo Real
                 </div>
               </div>
             </div>
@@ -587,44 +625,49 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
 
         {/* RIGHT PANEL: CUSTOMER INFO & KANBAN CARDS DRAWER */}
         {selectedChat && showCustomerDrawer && (
-          <div className="customer-info-drawer" style={{ width: '300px', minWidth: '280px', borderLeft: '1px solid var(--border-light)', background: 'var(--bg-subcard)', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="customer-info-drawer" style={{ width: '320px', minWidth: '300px', borderLeft: '1px solid #e2e8f0', background: '#ffffff', padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
             {/* Contact Header */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #10b981)', color: '#fff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', margin: '0 auto 10px' }}>
-                {selectedChat.contact_name ? selectedChat.contact_name.charAt(0).toUpperCase() : 'C'}
+            <div style={{ textAlign: 'center', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 12px', boxShadow: '0 6px 16px rgba(79, 70, 229, 0.25)' }}>
+                {getContactDisplayInfo(selectedChat).initial}
               </div>
-              <h3 style={{ fontSize: '1.02rem', fontWeight: '800', margin: '0 0 4px' }}>{selectedChat.contact_name}</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                <Phone size={12} /> {selectedChat.id.replace('@s.whatsapp.net', '')}
+              <h3 style={{ fontSize: '1.08rem', fontWeight: '800', color: '#0f172a', margin: '0 0 6px' }}>
+                {getContactDisplayInfo(selectedChat).title}
+              </h3>
+              <p style={{ fontSize: '0.82rem', fontWeight: '600', color: '#64748b', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <Phone size={14} /> {getContactDisplayInfo(selectedChat).phoneFormatted}
               </p>
             </div>
 
             {/* Linked Kanban Cards */}
-            <div className="glass-subcard" style={{ padding: '14px', borderRadius: '12px' }}>
-              <h4 style={{ fontSize: '0.85rem', fontWeight: '700', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary-accent)' }}>
-                <CalendarPlus size={16} /> Atendimentos no Kanban ({customerCards.length}):
+            <div className="glass-subcard" style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: '800', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#4f46e5' }}>
+                <CalendarPlus size={18} /> Atendimentos no Kanban ({customerCards.length}):
               </h4>
 
               {customerCards.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '12px 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.82rem', fontWeight: '600', color: '#64748b' }}>
                   Nenhum cartão no Kanban. Crie um novo atendimento abaixo!
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {customerCards.map(card => (
-                    <div key={card.id} style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                    <div key={card.id} style={{ background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a' }}>
                           {card.services?.title || 'Serviço'}
                         </span>
                         <span style={{
-                          fontSize: '0.68rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px',
-                          background: card.status === 'completed' ? 'rgba(16, 185, 129, 0.15)' :
-                                      card.status === 'in_progress' ? 'rgba(99, 102, 241, 0.15)' :
-                                      card.status === 'cancelled' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                          color: card.status === 'completed' ? '#10b981' :
-                                 card.status === 'in_progress' ? 'var(--primary-accent)' :
-                                 card.status === 'cancelled' ? '#ef4444' : '#f59e0b'
+                          fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '12px',
+                          background: card.status === 'completed' ? '#ecfdf5' :
+                                      card.status === 'in_progress' ? '#e0e7ff' :
+                                      card.status === 'cancelled' ? '#fef2f2' : '#fffbeb',
+                          color: card.status === 'completed' ? '#047857' :
+                                 card.status === 'in_progress' ? '#4338ca' :
+                                 card.status === 'cancelled' ? '#b91c1c' : '#b45309',
+                          border: card.status === 'completed' ? '1px solid #a7f3d0' :
+                                  card.status === 'in_progress' ? '1px solid #c7d2fe' :
+                                  card.status === 'cancelled' ? '1px solid #fecaca' : '1px solid #fde68a'
                         }}>
                           {card.status === 'created' ? 'Criado' :
                            card.status === 'in_progress' ? 'Em Andamento' :
@@ -633,12 +676,12 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                       </div>
 
                       {/* Quick Column Shift Selector */}
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                      <div style={{ marginTop: '8px' }}>
                         <select
-                          className="input-control select-sm"
+                          className="input-control select-control"
                           value={card.status}
                           onChange={(e) => handleChangeCardStatus(card.id, e.target.value)}
-                          style={{ fontSize: '0.72rem', padding: '2px 6px' }}
+                          style={{ fontSize: '0.78rem', fontWeight: '700', padding: '6px 10px', minHeight: '36px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a' }}
                         >
                           <option value="created">📌 Mover para: Criado</option>
                           <option value="in_progress">⚡ Mover para: Em Andamento</option>
@@ -657,9 +700,9 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
               type="button"
               className="btn primary"
               onClick={() => setShowConvertModal(true)}
-              style={{ width: '100%', padding: '10px', borderRadius: '10px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', fontSize: '0.88rem', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)' }}
             >
-              <CalendarPlus size={16} /> ➕ Criar Atendimento
+              <CalendarPlus size={18} /> ➕ Criar Atendimento
             </button>
           </div>
         )}
@@ -668,22 +711,23 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
       {/* Modal: Convert Chat to Service Appointment/Card */}
       {showConvertModal && (
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
-          <div className="modal-content glass-card" style={{ maxWidth: '520px', width: '90%', padding: '24px', borderRadius: '16px' }}>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CalendarPlus size={22} className="accent-icon" /> Converter Conversa em Cartão
+          <div className="modal-content glass-card" style={{ maxWidth: '520px', width: '90%', padding: '28px', borderRadius: '20px', background: '#ffffff' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CalendarPlus size={24} style={{ color: '#4f46e5' }} /> Converter Conversa em Cartão
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Cliente: <strong>{selectedChat?.contact_name}</strong> ({selectedChat?.id.replace('@s.whatsapp.net', '')})
+            <p style={{ fontSize: '0.88rem', fontWeight: '600', color: '#64748b', marginBottom: '20px' }}>
+              Cliente: <strong style={{ color: '#0f172a' }}>{selectedChat?.contact_name}</strong> ({selectedChat?.id.replace('@s.whatsapp.net', '')})
             </p>
 
             <form onSubmit={handleConvertChatToCard}>
-              <div className="form-group">
-                <label className="form-label">Selecione o Serviço</label>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontWeight: '800', color: '#0f172a', fontSize: '0.88rem' }}>Selecione o Serviço</label>
                 <select
                   className="input-control select-control"
                   value={selectedServiceId}
                   onChange={(e) => setSelectedServiceId(e.target.value)}
                   required
+                  style={{ background: '#ffffff', color: '#0f172a', fontWeight: '700' }}
                 >
                   <option value="">-- Escolha o serviço desejado --</option>
                   {services.map((s) => (
@@ -693,8 +737,8 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
               </div>
 
               {currentSelectedService && currentSelectedService.custom_fields?.map((field) => (
-                <div key={field.id} className="form-group">
-                  <label className="form-label">
+                <div key={field.id} className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.85rem' }}>
                     {field.field_label} {field.is_required && '*'}
                   </label>
                   <input
@@ -703,16 +747,17 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                     required={field.is_required}
                     placeholder={`Informe ${field.field_label.toLowerCase()}`}
                     onChange={(e) => setCollectedData({ ...collectedData, [field.field_label]: e.target.value })}
+                    style={{ background: '#ffffff', color: '#0f172a' }}
                   />
                 </div>
               ))}
 
-              <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button type="button" className="btn secondary" onClick={() => setShowConvertModal(false)}>
+              <div className="modal-actions" style={{ marginTop: '28px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button type="button" className="btn secondary" onClick={() => setShowConvertModal(false)} style={{ padding: '10px 20px', borderRadius: '10px' }}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn primary">
-                  <CheckCircle size={16} /> Confirmar & Criar Atendimento
+                <button type="submit" className="btn primary" style={{ padding: '10px 24px', borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)' }}>
+                  <CheckCircle size={18} /> Confirmar & Criar Atendimento
                 </button>
               </div>
             </form>
@@ -723,9 +768,9 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
       {/* Modal: Attachment File Upload */}
       {showAttachmentModal && (
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
-          <div className="modal-content glass-card" style={{ maxWidth: '440px', width: '90%', padding: '24px', borderRadius: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Paperclip size={18} className="accent-icon" /> Anexar Documento ou Foto
+          <div className="modal-content glass-card" style={{ maxWidth: '460px', width: '90%', padding: '28px', borderRadius: '20px', background: '#ffffff' }}>
+            <h3 style={{ fontSize: '1.08rem', fontWeight: '800', color: '#0f172a', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Paperclip size={20} style={{ color: '#4f46e5' }} /> Anexar Documento ou Foto
             </h3>
 
             <input
@@ -733,17 +778,17 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
               accept=".pdf,.png,.jpg,.jpeg"
               onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
               className="input-control"
-              style={{ marginBottom: '16px' }}
+              style={{ marginBottom: '18px', background: '#f8fafc', color: '#0f172a' }}
             />
 
             {attachmentFile && (
-              <div style={{ fontSize: '0.82rem', color: '#10b981', marginBottom: '16px', fontWeight: '600' }}>
+              <div style={{ fontSize: '0.85rem', color: '#047857', marginBottom: '18px', fontWeight: '700', padding: '8px 14px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px' }}>
                 ✓ Arquivo selecionado: {attachmentFile.name}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" className="btn secondary" onClick={() => { setShowAttachmentModal(false); setAttachmentFile(null); }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button type="button" className="btn secondary" onClick={() => { setShowAttachmentModal(false); setAttachmentFile(null); }} style={{ padding: '8px 18px', borderRadius: '10px' }}>
                 Cancelar
               </button>
               <button
@@ -755,6 +800,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                   setShowAttachmentModal(false);
                   setAttachmentFile(null);
                 }}
+                style={{ padding: '8px 20px', borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)' }}
               >
                 Anexar ao Texto
               </button>
