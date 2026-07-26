@@ -352,26 +352,46 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
           const timestampMs = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now();
           const timestampIso = new Date(timestampMs).toISOString();
 
+          // Fetch WhatsApp Profile Picture URL if socket is available
+          let profilePicUrl = null;
+          if (sock && typeof sock.profilePictureUrl === 'function') {
+            try {
+              profilePicUrl = await sock.profilePictureUrl(remoteJid, 'image');
+            } catch (e) {
+              // Silently handle privacy restrictions or contacts without picture
+            }
+          }
+
           try {
             const { processWhatsAppConsentKeywords } = await import('./whatsappOptOutService.js');
             await processWhatsAppConsentKeywords(activeTenantId, senderPhone, content);
 
+            const chatPayload = {
+              id: remoteJid,
+              tenant_id: activeTenantId,
+              contact_name: contactName,
+              updated_at: timestampIso
+            };
+            if (profilePicUrl) {
+              chatPayload.profile_picture_url = profilePicUrl;
+            }
+
             await supabase
               .from('chats')
-              .upsert({
-                id: remoteJid,
-                tenant_id: activeTenantId,
-                contact_name: contactName,
-                updated_at: timestampIso
-              }, { onConflict: 'id' });
+              .upsert(chatPayload, { onConflict: 'id' });
+
+            const contactPayload = {
+              tenant_id: activeTenantId,
+              name: contactName,
+              phone: senderPhone
+            };
+            if (profilePicUrl) {
+              contactPayload.profile_picture_url = profilePicUrl;
+            }
 
             await supabase
               .from('contacts')
-              .upsert({
-                tenant_id: activeTenantId,
-                name: contactName,
-                phone: senderPhone
-              }, { onConflict: 'tenant_id,phone' });
+              .upsert(contactPayload, { onConflict: 'tenant_id,phone' });
 
             await supabase
               .from('messages')

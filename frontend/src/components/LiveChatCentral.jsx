@@ -410,7 +410,15 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <div className="wa-avatar-circle" style={{ width: '44px', height: '44px', borderRadius: '50%', background: isSelected ? 'linear-gradient(135deg, #4f46e5, #10b981)' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.05rem', boxShadow: isSelected ? '0 4px 10px rgba(79, 70, 229, 0.2)' : 'none' }}>
+                  {chat.profile_picture_url ? (
+                    <img
+                      src={chat.profile_picture_url}
+                      alt={info.title}
+                      style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: isSelected ? '2px solid #4f46e5' : '1px solid #cbd5e1' }}
+                      onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
+                    />
+                  ) : null}
+                  <div className="wa-avatar-circle" style={{ display: chat.profile_picture_url ? 'none' : 'flex', width: '44px', height: '44px', borderRadius: '50%', background: isSelected ? 'linear-gradient(135deg, #4f46e5, #10b981)' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', fontWeight: '800', alignItems: 'center', justifyContent: 'center', fontSize: '1.05rem', boxShadow: isSelected ? '0 4px 10px rgba(79, 70, 229, 0.2)' : 'none' }}>
                     {info.initial}
                   </div>
 
@@ -454,7 +462,15 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
               {/* WhatsApp Web Chat Header */}
               <div className="wa-chat-header" style={{ padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', background: '#ffffff', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
                 <div className="wa-contact-header-info" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div className="wa-avatar-circle" style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
+                  {selectedChat.profile_picture_url ? (
+                    <img
+                      src={selectedChat.profile_picture_url}
+                      alt={getContactDisplayInfo(selectedChat).title}
+                      style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}
+                      onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
+                    />
+                  ) : null}
+                  <div className="wa-avatar-circle" style={{ display: selectedChat.profile_picture_url ? 'none' : 'flex', width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', fontWeight: '800', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
                     {getContactDisplayInfo(selectedChat).initial}
                   </div>
                   <div>
