@@ -170,8 +170,17 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
       )
       .subscribe();
 
+    // Interval fallback polling for 100% message arrival guarantee
+    const pollInterval = setInterval(() => {
+      fetchChats();
+      if (selectedChat) {
+        fetchMessages(selectedChat.id);
+      }
+    }, 4000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [tenantId, selectedChat]);
 
