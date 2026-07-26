@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase.js';
+import { prisma } from '../config/db.js';
 import { triggerCardNotification } from '../services/notificationEngine.js';
 import { getOrEnsureValidTenant, sendTypingPresence, markMessageAsRead } from '../services/whatsapp.js';
 
@@ -6,16 +6,17 @@ export async function getChats(req, res) {
   try {
     const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    let { data: chats, error } = await supabase
-      .from('chats')
-      .select('*')
-      .eq('tenant_id', activeTenantId)
-      .not('id', 'like', '%@lid%')
-      .not('id', 'like', '%status@broadcast%')
-      .not('id', 'like', '%@g.us%')
-      .order('updated_at', { ascending: false });
-
-    if (error) throw error;
+    const chats = await prisma.chat.findMany({
+      where: {
+        tenant_id: activeTenantId,
+        NOT: [
+          { id: { contains: '@lid' } },
+          { id: { contains: 'status@broadcast' } },
+          { id: { contains: '@g.us' } }
+        ]
+      },
+      orderBy: { updated_at: 'desc' }
+    });
 
     return res.json(chats || []);
   } catch (err) {
@@ -27,13 +28,10 @@ export async function getMessages(req, res) {
   try {
     const { chatId } = req.params;
 
-    const { data: messages, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .order('timestamp', { ascending: true });
-
-    if (error) throw error;
+    const messages = await prisma.message.findMany({
+      where: { chat_id: chatId },
+      orderBy: { timestamp: 'asc' }
+    });
 
     return res.json(messages);
   } catch (err) {
@@ -84,57 +82,47 @@ export async function convertChatToCard(req, res) {
 
     const phone = chat_id.replace('@s.whatsapp.net', '').replace(/\D/g, '');
 
-    // 1. Find or Create Contact in Supabase
-    let { data: contact } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('tenant_id', activeTenantId)
-      .eq('phone', phone)
-      .maybeSingle();
+    // 1. Find or Create Contact in SQLite
+    let contact = await prisma.contact.findUnique({
+      where: { tenant_id_phone: { tenant_id: activeTenantId, phone } }
+    });
 
     if (!contact) {
-      const { data: newContact, error: cErr } = await supabase
-        .from('contacts')
-        .insert({
+      contact = await prisma.contact.create({
+        data: {
           tenant_id: activeTenantId,
           name: contact_name || phone,
           phone: phone
-        })
-        .select()
-        .single();
-
-      if (cErr) throw cErr;
-      contact = newContact;
+        }
+      });
     }
 
     // 2. Fetch service questions schema to build title & metadata
-    const { data: service } = await supabase
-      .from('services')
-      .select('*')
-      .eq('id', service_id)
-      .single();
+    const service = await prisma.service.findUnique({
+      where: { id: service_id }
+    });
 
     // 3. Create Card in Kanban Board
-    const { data: card, error: cardErr } = await supabase
-      .from('cards')
-      .insert({
+    const card = await prisma.card.create({
+      data: {
         tenant_id: activeTenantId,
         service_id: service_id,
         contact_id: contact.id,
         status: 'created',
-        collected_data: collected_data || {}
-      })
-      .select('*, services(*), contacts(*)')
-      .single();
-
-    if (cardErr) throw cardErr;
+        collected_data: typeof collected_data === 'string' ? collected_data : JSON.stringify(collected_data || {})
+      },
+      include: {
+        service: true,
+        contact: true
+      }
+    });
 
     // 4. Trigger Automatic WhatsApp Notification for Card Created Trigger
     triggerCardNotification({
       tenantId: activeTenantId,
       triggerType: 'card_created',
       card: card,
-      service: service || card.services,
+      service: service || card.service,
       contactPhone: phone
     }).catch(err => console.error('Error triggering automated WhatsApp notification:', err));
 

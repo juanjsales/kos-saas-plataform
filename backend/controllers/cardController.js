@@ -1,5 +1,5 @@
-import { supabase } from '../config/supabase.js';
-import { triggerCardNotification, interpolateTemplate } from '../services/notificationEngine.js';
+import { prisma } from '../config/db.js';
+import { triggerCardNotification } from '../services/notificationEngine.js';
 import { processDocumentAttachment } from '../services/documentProcessor.js';
 import { sendWhatsAppMessage, getOrEnsureValidTenant } from '../services/whatsapp.js';
 
@@ -7,8 +7,10 @@ export async function createCard(req, res) {
   try {
     const { tenant_id, service_id, contact_id, contact_name, contact_phone, status, collected_data } = req.body;
 
-    if (!tenant_id || !service_id) {
-      return res.status(400).json({ error: 'tenant_id and service_id are required' });
+    const activeTenantId = await getOrEnsureValidTenant(tenant_id);
+
+    if (!service_id) {
+      return res.status(400).json({ error: 'service_id é obrigatório' });
     }
 
     let finalContactId = contact_id;
@@ -16,54 +18,92 @@ export async function createCard(req, res) {
     // Auto upsert contact if name and phone are provided
     if (!finalContactId && contact_name && contact_phone) {
       const cleanPhone = contact_phone.replace(/\D/g, '');
-      const { data: contact, error: contactErr } = await supabase
-        .from('contacts')
-        .upsert({
-          tenant_id,
-          name: contact_name,
-          phone: cleanPhone
-        }, { onConflict: 'tenant_id,phone' })
-        .select()
-        .single();
+      const existing = await prisma.contact.findUnique({
+        where: { tenant_id_phone: { tenant_id: activeTenantId, phone: cleanPhone } }
+      });
 
-      if (contactErr) throw contactErr;
-      finalContactId = contact.id;
+      if (existing) {
+        finalContactId = existing.id;
+      } else {
+        const newContact = await prisma.contact.create({
+          data: {
+            tenant_id: activeTenantId,
+            name: contact_name,
+            phone: cleanPhone
+          }
+        });
+        finalContactId = newContact.id;
+      }
     }
 
     if (!finalContactId) {
-      return res.status(400).json({ error: 'contact_id or contact_name + contact_phone is required' });
+      return res.status(400).json({ error: 'contact_id ou nome/telefone são obrigatórios' });
     }
 
     const cardStatus = status || 'created';
 
-    const { data: card, error } = await supabase
-      .from('cards')
-      .insert({
-        tenant_id,
+    const card = await prisma.card.create({
+      data: {
+        tenant_id: activeTenantId,
         service_id,
         contact_id: finalContactId,
         status: cardStatus,
-        collected_data: collected_data || {}
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Trigger notification and workflows asynchronously
-    const triggerEvent = cardStatus === 'created' ? 'card_created' : `status_${cardStatus}`;
-    triggerCardNotification(card.id, triggerEvent).catch(err => {
-      console.error(`Async notification error on card create (${triggerEvent}):`, err);
+        collected_data: typeof collected_data === 'string' ? collected_data : JSON.stringify(collected_data || {})
+      },
+      include: {
+        service: true,
+        contact: true
+      }
     });
 
-    const { evaluateCardWorkflows } = await import('../services/workflowEngine.js');
-    evaluateCardWorkflows(card.id, 'on_card_created').catch(err => {
-      console.error('Workflow engine error on card create:', err);
-    });
+    // Trigger Automated WhatsApp Notification
+    if (card.contact?.phone) {
+      triggerCardNotification({
+        tenantId: activeTenantId,
+        triggerType: 'card_created',
+        card: card,
+        service: card.service,
+        contactPhone: card.contact.phone
+      }).catch(err => console.error('Error triggering automated notification:', err));
+    }
 
     return res.status(201).json(card);
   } catch (err) {
     console.error('Error creating card:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getCards(req, res) {
+  try {
+    const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
+
+    const cards = await prisma.card.findMany({
+      where: { tenant_id: activeTenantId },
+      include: {
+        service: true,
+        contact: true
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    const parsed = cards.map(c => {
+      let data = {};
+      let metadata = {};
+      try { data = JSON.parse(c.collected_data); } catch (e) {}
+      try { metadata = JSON.parse(c.ocr_metadata); } catch (e) {}
+
+      return {
+        ...c,
+        collected_data: data,
+        ocr_metadata: metadata,
+        services: c.service,
+        contacts: c.contact
+      };
+    });
+
+    return res.json(parsed);
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 }
@@ -73,245 +113,76 @@ export async function updateCardStatus(req, res) {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status) {
-      return res.status(400).json({ error: 'status is required' });
+    if (!id || !status) {
+      return res.status(400).json({ error: 'id and status are required' });
     }
 
-    const { data: card, error } = await supabase
-      .from('cards')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    const validStatuses = ['created', 'in_progress', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Status inválido. Deve ser um de: ${validStatuses.join(', ')}` });
+    }
 
-    if (error) throw error;
-
-    // Trigger notification for status update (e.g. status_in_progress, status_completed, status_cancelled)
-    const triggerEvent = `status_${status}`;
-    triggerCardNotification(card.id, triggerEvent).catch(err => {
-      console.error(`Async notification error on trigger ${triggerEvent}:`, err);
+    const updatedCard = await prisma.card.update({
+      where: { id },
+      data: { status },
+      include: { service: true, contact: true }
     });
 
-    const { evaluateCardWorkflows } = await import('../services/workflowEngine.js');
-    evaluateCardWorkflows(card.id, 'on_status_change').catch(err => {
-      console.error('Workflow engine error on status change:', err);
-    });
+    // Trigger status notification
+    if (updatedCard.contact?.phone) {
+      const triggerType = `status_${status}`;
+      triggerCardNotification({
+        tenantId: updatedCard.tenant_id,
+        triggerType,
+        card: updatedCard,
+        service: updatedCard.service,
+        contactPhone: updatedCard.contact.phone
+      }).catch(err => console.error('Error triggering notification on status update:', err));
+    }
 
-    return res.json(card);
+    return res.json(updatedCard);
   } catch (err) {
+    console.error('Error updating card status:', err);
     return res.status(500).json({ error: err.message });
   }
 }
 
-export async function getCards(req, res) {
-  try {
-    const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
-
-    let { data: cards, error } = await supabase
-      .from('cards')
-      .select(`
-        *,
-        services ( title, description, confirmation_template, completion_type ),
-        contacts ( name, phone )
-      `)
-      .eq('tenant_id', activeTenantId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return res.json(cards || []);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * Service Confirmation endpoint POST /api/cards/:id/confirm
- */
-export async function confirmCard(req, res) {
+export async function processCardOcr(req, res) {
   try {
     const { id } = req.params;
-    const { collected_data, confirmed_by } = req.body;
-
-    const now = new Date().toISOString();
-
-    // 1. Update card in Supabase
-    const { data: card, error } = await supabase
-      .from('cards')
-      .update({
-        collected_data: collected_data || {},
-        confirmed_at: now,
-        confirmed_by: confirmed_by || null,
-        updated_at: now
-      })
-      .eq('id', id)
-      .select(`
-        *,
-        services ( title, confirmation_template ),
-        contacts ( name, phone )
-      `)
-      .single();
-
-    if (error || !card) {
-      return res.status(400).json({ error: error?.message || 'Card not found' });
-    }
-
-    // 2. Trigger notification via unified triggerCardNotification (prevents duplicate dispatches)
-    triggerCardNotification(card.id, 'status_completed').catch(err => {
-      console.error('Async notification error on card confirmation:', err);
-    });
-
-    return res.json(card);
-  } catch (err) {
-    console.error('Error confirming card:', err);
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * Analyzes uploaded attachment document via OCR and uploads to Supabase Storage
- */
-export async function analyzeCardAttachment(req, res) {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
     const file = req.file;
 
-    // Strict MIME-Type validation to prevent RCE / malicious script uploads
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      return res.status(400).json({ error: 'Tipo de arquivo não permitido. Envie apenas imagens (JPG, PNG, WEBP), PDF ou arquivo TXT.' });
+    if (!file) {
+      return res.status(400).json({ error: 'Arquivo do documento é obrigatório' });
     }
 
-    const tenantId = req.body.tenant_id || '00000000-0000-0000-0000-000000000001';
-    const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
-    const filePath = `${tenantId}/${fileName}`;
+    const card = await prisma.card.findUnique({
+      where: { id },
+      include: { service: true, contact: true }
+    });
 
-    // 1. Upload file to Supabase Storage bucket 'card-attachments'
-    const { data: uploadData, error: uploadErr } = await supabase.storage
-      .from('card-attachments')
-      .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true
-      });
-
-    if (uploadErr) {
-      console.error('Supabase storage upload error:', uploadErr);
+    if (!card) {
+      return res.status(404).json({ error: 'Cartão de atendimento não encontrado' });
     }
 
-    // 2. Get Public URL
-    const { data: urlData } = supabase.storage
-      .from('card-attachments')
-      .getPublicUrl(filePath);
+    const ocrResult = await processDocumentAttachment(file, card.service);
 
-    const attachmentUrl = urlData?.publicUrl || uploadData?.path || filePath;
-
-    // 3. Extract OCR metadata
-    const extractedMetadata = await processDocumentAttachment(file.buffer, file.mimetype, file.originalname);
+    const updatedCard = await prisma.card.update({
+      where: { id },
+      data: {
+        ocr_metadata: JSON.stringify(ocrResult.extracted_data || {}),
+        ocr_file_url: ocrResult.file_url || null
+      },
+      include: { service: true, contact: true }
+    });
 
     return res.json({
-      success: true,
-      attachment_url: attachmentUrl,
-      attachment_metadata: extractedMetadata
+      message: 'Documento processado com sucesso!',
+      ocr_result: ocrResult,
+      card: updatedCard
     });
   } catch (err) {
-    console.error('Error analyzing attachment:', err);
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * Completes a card with attachment URL and OCR metadata
- */
-export async function completeCardWithAttachment(req, res) {
-  try {
-    const { id } = req.params;
-    let { attachment_url, attachment_metadata, collected_data } = req.body;
-
-    if (typeof attachment_metadata === 'string') {
-      try {
-        attachment_metadata = JSON.parse(attachment_metadata);
-      } catch (e) {}
-    }
-
-    if (typeof collected_data === 'string') {
-      try {
-        collected_data = JSON.parse(collected_data);
-      } catch (e) {}
-    }
-
-    // If file is directly uploaded in this request
-    if (req.file) {
-      const file = req.file;
-      const tenantId = req.body.tenant_id || '00000000-0000-0000-0000-000000000001';
-      const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
-      const filePath = `${tenantId}/${id}/${fileName}`;
-
-      await supabase.storage
-        .from('card-attachments')
-        .upload(filePath, file.buffer, { contentType: file.mimetype, upsert: true });
-
-      const { data: urlData } = supabase.storage
-        .from('card-attachments')
-        .getPublicUrl(filePath);
-
-      attachment_url = urlData?.publicUrl || filePath;
-      if (!attachment_metadata) {
-        attachment_metadata = await processDocumentAttachment(file.buffer, file.mimetype, file.originalname);
-      }
-    }
-
-    const now = new Date().toISOString();
-
-    const updatePayload = {
-      status: 'completed',
-      attachment_url: attachment_url || null,
-      attachment_metadata: attachment_metadata || {},
-      completed_at: now,
-      updated_at: now
-    };
-
-    if (collected_data) {
-      updatePayload.collected_data = collected_data;
-    }
-
-    const { data: card, error } = await supabase
-      .from('cards')
-      .update(updatePayload)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Trigger WhatsApp notification for completion
-    triggerCardNotification(card.id, 'status_completed').catch(err => {
-      console.error('Async notification error on completion:', err);
-    });
-
-    return res.json(card);
-  } catch (err) {
-    console.error('Error completing card with attachment:', err);
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-/**
- * Endpoint POST /api/cards/:id/execute-automation
- * Triggers RPA external form filling automation worker
- */
-export async function executeAutomation(req, res) {
-  try {
-    const { id } = req.params;
-    const { executeExternalAutomation } = await import('../services/automationService.js');
-
-    // Trigger automation asynchronously or await result
-    const result = await executeExternalAutomation(id);
-    return res.json(result);
-  } catch (err) {
-    console.error('Error executing automation endpoint:', err);
+    console.error('Error processing card OCR:', err);
     return res.status(500).json({ error: err.message });
   }
 }

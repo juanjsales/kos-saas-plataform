@@ -1,0 +1,115 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id               String             @id @default(uuid())
+  name             String
+  cnpj             String?
+  created_at       DateTime           @default(now())
+  users            User[]
+  services         Service[]
+  contacts         Contact[]
+  cards            Card[]
+  notificationRules NotificationRule[]
+  whatsappSessions WhatsAppSession[]
+}
+
+model User {
+  id            String   @id @default(uuid())
+  tenant_id     String
+  email         String   @unique
+  password_hash String
+  full_name     String?
+  role          String   @default("tenant_operator") // 'super_admin', 'tenant_admin', 'tenant_operator'
+  created_at    DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+}
+
+model Service {
+  id                String             @id @default(uuid())
+  tenant_id         String
+  title             String
+  questions_schema  String             @default("[]") // JSON string
+  ocr_enabled       Boolean            @default(true)
+  ocr_fields        String             @default("[]") // JSON string
+  whatsapp_triggers String             @default("{}") // JSON string
+  created_at        DateTime           @default(now())
+  tenant            Tenant             @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  cards             Card[]
+  notificationRules NotificationRule[]
+}
+
+model Contact {
+  id                  String   @id @default(uuid())
+  tenant_id           String
+  phone               String
+  name                String?
+  profile_picture_url String?
+  created_at          DateTime @default(now())
+  tenant              Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  cards               Card[]
+
+  @@unique([tenant_id, phone])
+}
+
+model Card {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  service_id     String
+  contact_id     String
+  status         String   @default("created") // 'created', 'in_progress', 'completed', 'cancelled'
+  collected_data String   @default("{}") // JSON string
+  ocr_metadata   String   @default("{}") // JSON string
+  ocr_file_url   String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
+  tenant         Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  service        Service  @relation(fields: [service_id], references: [id], onDelete: Cascade)
+  contact        Contact  @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id           String   @id @default(uuid())
+  chat_id      String
+  sender_phone String
+  content      String
+  timestamp    DateTime @default(now())
+}
+
+model Chat {
+  id                  String   @id @default(uuid())
+  tenant_id           String
+  contact_name        String?
+  profile_picture_url String?
+  unread_count        Int      @default(0)
+  updated_at          DateTime @default(now())
+}
+
+model NotificationRule {
+  id           String   @id @default(uuid())
+  tenant_id    String
+  service_id   String
+  trigger_type String   // 'card_created', 'status_in_progress', 'status_completed', 'status_cancelled'
+  message_template String
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  service      Service  @relation(fields: [service_id], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppSession {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  file_name  String
+  file_data  String
+  updated_at DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, file_name])
+}

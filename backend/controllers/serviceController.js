@@ -1,50 +1,28 @@
-import { supabase } from '../config/supabase.js';
+import { prisma } from '../config/db.js';
 import { getOrEnsureValidTenant } from '../services/whatsapp.js';
 
 export async function createService(req, res) {
   try {
-    const { tenant_id, title, description, completion_type, external_url, automation_mapping, custom_fields } = req.body;
+    const { tenant_id, title, questions_schema, ocr_enabled, ocr_fields, whatsapp_triggers } = req.body;
 
-    if (!tenant_id || !title) {
-      return res.status(400).json({ error: 'tenant_id and title are required' });
+    const activeTenantId = await getOrEnsureValidTenant(tenant_id);
+
+    if (!title) {
+      return res.status(400).json({ error: 'O título do serviço é obrigatório.' });
     }
 
-    // 1. Insert service
-    const { data: service, error: serviceErr } = await supabase
-      .from('services')
-      .insert({
-        tenant_id,
+    const service = await prisma.service.create({
+      data: {
+        tenant_id: activeTenantId,
         title,
-        description,
-        completion_type: completion_type || 'identity',
-        external_url: external_url || null,
-        automation_mapping: automation_mapping || {}
-      })
-      .select()
-      .single();
+        questions_schema: typeof questions_schema === 'string' ? questions_schema : JSON.stringify(questions_schema || []),
+        ocr_enabled: ocr_enabled !== false,
+        ocr_fields: typeof ocr_fields === 'string' ? ocr_fields : JSON.stringify(ocr_fields || []),
+        whatsapp_triggers: typeof whatsapp_triggers === 'string' ? whatsapp_triggers : JSON.stringify(whatsapp_triggers || {})
+      }
+    });
 
-    if (serviceErr) throw serviceErr;
-
-    // 2. Insert custom fields if present
-    let fields = [];
-    if (custom_fields && Array.isArray(custom_fields) && custom_fields.length > 0) {
-      const fieldsToInsert = custom_fields.map(field => ({
-        service_id: service.id,
-        field_label: field.field_label,
-        field_type: field.field_type || 'text',
-        is_required: !!field.is_required
-      }));
-
-      const { data: createdFields, error: fieldsErr } = await supabase
-        .from('custom_fields')
-        .insert(fieldsToInsert)
-        .select();
-
-      if (fieldsErr) throw fieldsErr;
-      fields = createdFields;
-    }
-
-    return res.status(201).json({ ...service, custom_fields: fields });
+    return res.status(201).json(service);
   } catch (err) {
     console.error('Error creating service:', err);
     return res.status(500).json({ error: err.message });
@@ -54,60 +32,33 @@ export async function createService(req, res) {
 export async function updateService(req, res) {
   try {
     const { id } = req.params;
-    const { title, description, completion_type, confirmation_template, confirmation_schema, ocr_enabled, ocr_fields, external_url, automation_mapping, custom_fields } = req.body;
+    const { title, questions_schema, ocr_enabled, ocr_fields, whatsapp_triggers } = req.body;
 
     if (!id || !title) {
-      return res.status(400).json({ error: 'service id and title are required' });
+      return res.status(400).json({ error: 'O id e o título do serviço são obrigatórios.' });
     }
 
-    const updatePayload = {
-      title,
-      description,
-      completion_type: completion_type || 'identity',
-      external_url: external_url || null,
-      automation_mapping: automation_mapping || {},
-      updated_at: new Date().toISOString()
+    const updateData = {
+      title
     };
 
-    if (confirmation_template !== undefined) updatePayload.confirmation_template = confirmation_template;
-    if (confirmation_schema !== undefined) updatePayload.confirmation_schema = confirmation_schema;
-    if (ocr_enabled !== undefined) updatePayload.ocr_enabled = ocr_enabled;
-    if (ocr_fields !== undefined) updatePayload.ocr_fields = ocr_fields;
-
-    // 1. Update service details
-    const { data: service, error: updateErr } = await supabase
-      .from('services')
-      .update(updatePayload)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (updateErr) throw updateErr;
-
-    // 2. Replace custom fields
-    if (custom_fields && Array.isArray(custom_fields)) {
-      // Delete old fields
-      await supabase.from('custom_fields').delete().eq('service_id', id);
-
-      const fieldsToInsert = custom_fields
-        .filter(f => f.field_label?.trim())
-        .map(field => ({
-          service_id: id,
-          field_label: field.field_label,
-          field_type: field.field_type || 'text',
-          is_required: !!field.is_required
-        }));
-
-      if (fieldsToInsert.length > 0) {
-        const { data: newFields } = await supabase
-          .from('custom_fields')
-          .insert(fieldsToInsert)
-          .select();
-        service.custom_fields = newFields;
-      } else {
-        service.custom_fields = [];
-      }
+    if (questions_schema !== undefined) {
+      updateData.questions_schema = typeof questions_schema === 'string' ? questions_schema : JSON.stringify(questions_schema);
     }
+    if (ocr_enabled !== undefined) {
+      updateData.ocr_enabled = !!ocr_enabled;
+    }
+    if (ocr_fields !== undefined) {
+      updateData.ocr_fields = typeof ocr_fields === 'string' ? ocr_fields : JSON.stringify(ocr_fields);
+    }
+    if (whatsapp_triggers !== undefined) {
+      updateData.whatsapp_triggers = typeof whatsapp_triggers === 'string' ? whatsapp_triggers : JSON.stringify(whatsapp_triggers);
+    }
+
+    const service = await prisma.service.update({
+      where: { id },
+      data: updateData
+    });
 
     return res.json(service);
   } catch (err) {
@@ -120,12 +71,9 @@ export async function deleteService(req, res) {
   try {
     const { id } = req.params;
 
-    // Delete custom fields first
-    await supabase.from('custom_fields').delete().eq('service_id', id);
-
-    // Delete service
-    const { error } = await supabase.from('services').delete().eq('id', id);
-    if (error) throw error;
+    await prisma.service.delete({
+      where: { id }
+    });
 
     return res.json({ success: true, message: 'Serviço excluído com sucesso.' });
   } catch (err) {
@@ -138,18 +86,29 @@ export async function getServices(req, res) {
   try {
     const activeTenantId = await getOrEnsureValidTenant(req.query.tenant_id);
 
-    const { data: services, error } = await supabase
-      .from('services')
-      .select(`
-        *,
-        custom_fields (*)
-      `)
-      .eq('tenant_id', activeTenantId)
-      .order('created_at', { ascending: false });
+    const services = await prisma.service.findMany({
+      where: { tenant_id: activeTenantId },
+      orderBy: { created_at: 'desc' }
+    });
 
-    if (error) throw error;
+    // Parse JSON string fields safely for frontend consumption
+    const parsed = services.map(s => {
+      let questions = [];
+      let fields = [];
+      let triggers = {};
+      try { questions = JSON.parse(s.questions_schema); } catch (e) {}
+      try { fields = JSON.parse(s.ocr_fields); } catch (e) {}
+      try { triggers = JSON.parse(s.whatsapp_triggers); } catch (e) {}
 
-    return res.json(services || []);
+      return {
+        ...s,
+        questions_schema: questions,
+        ocr_fields: fields,
+        whatsapp_triggers: triggers
+      };
+    });
+
+    return res.json(parsed);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

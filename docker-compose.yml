@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  kos-local-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kos_on_premise_server
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - HOST=0.0.0.0
+      - JWT_SECRET=kos_local_jwt_secret_key_2026_secure
+      - DATABASE_URL=file:/app/backend/data/database/kos_database.db
+      - ENABLE_WHATSAPP=true
+    volumes:
+      - kos_data_volume:/app/backend/data
+
+volumes:
+  kos_data_volume:
+    driver: local

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../config/supabaseClient';
 
 const AuthContext = createContext();
 
@@ -9,16 +8,40 @@ export function AuthProvider({ children, apiBaseUrl }) {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize session from Supabase or localStorage
+  const getSafeApiUrl = () => {
+    if (apiBaseUrl) return apiBaseUrl;
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      return `http://${hostname}:4000`;
+    }
+    return 'http://localhost:4000';
+  };
+
   useEffect(() => {
     async function initSession() {
       try {
-        const storedUser = localStorage.getItem('saas_user_session');
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
+        const storedToken = localStorage.getItem('kos_jwt_token');
+        const storedSession = localStorage.getItem('saas_user_session');
+
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
           setUser(parsed.user);
-          setProfile(parsed.profile);
+          setProfile(parsed.profile || parsed.user);
           setTenant(parsed.tenant);
+        }
+
+        if (storedToken) {
+          const safeUrl = getSafeApiUrl();
+          const res = await fetch(`${safeUrl}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${storedToken}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data.user);
+            setProfile(data.profile);
+            setTenant(data.tenant);
+          }
         }
       } catch (err) {
         console.error('Error initializing auth session:', err);
@@ -29,147 +52,76 @@ export function AuthProvider({ children, apiBaseUrl }) {
     initSession();
   }, []);
 
-  const getSafeApiUrl = () => {
-    const rawUrl = apiBaseUrl || import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
-    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1'))) {
-      return 'https://kos-backend-tuqi.onrender.com';
-    }
-    return rawUrl;
-  };
-
   const login = async (email, password) => {
     setLoading(true);
     const safeApiUrl = getSafeApiUrl();
     try {
-      let userData = null;
-      let profileData = null;
-      let tenantData = null;
+      const res = await fetch(`${safeApiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-      // 1. Authenticate via Supabase Auth
-      try {
-        const { data: authRes, error: authErr } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+      const data = await res.json();
 
-        if (authErr) {
-          throw new Error('E-mail ou senha incorretos. Verifique suas credenciais.');
-        }
-
-        if (authRes?.user) {
-          userData = authRes.user;
-
-          // Fetch matching profile from public.users table
-          const { data: pData } = await supabase
-            .from('users')
-            .select('*')
-            .or(`id.eq.${userData.id},email.eq.${email}`)
-            .maybeSingle();
-
-          if (pData) {
-            profileData = pData;
-          } else {
-            profileData = {
-              id: userData.id,
-              full_name: userData.user_metadata?.full_name || email,
-              role: userData.user_metadata?.role || 'tenant_admin',
-              tenant_id: userData.user_metadata?.tenant_id || null
-            };
-          }
-        }
-      } catch (e) {
-        throw new Error(e.message || 'Erro ao realizar login. Tente novamente.');
+      if (!res.ok) {
+        throw new Error(data.error || 'Falha ao autenticar. Verifique suas credenciais.');
       }
 
-      if (!userData) {
-        throw new Error('Não foi possível autenticar o usuário. Verifique suas credenciais.');
-      }
-
-      // 3. Fetch Tenant Details to check suspension status (safe non-blocking check)
-      try {
-        const tRes = await fetch(`${safeApiUrl}/api/admin/tenants`);
-        if (tRes.ok) {
-          const tenants = await tRes.json();
-          if (tenants && tenants.length > 0) {
-            const reqId = profileData?.tenant_id;
-            const found = reqId ? (tenants.find(t => t.id === reqId) || tenants[0]) : tenants[0];
-            if (found) {
-              tenantData = found;
-              if (!profileData.tenant_id) {
-                profileData.tenant_id = found.id;
-              }
-              if (found.status === 'suspended' && profileData?.role !== 'super_admin') {
-                throw new Error(`A conta da empresa "${found.name}" está suspensa. Entre em contato com o suporte.`);
-              }
-            }
-          }
-        }
-      } catch (tErr) {
-        if (tErr.message?.includes('suspensa')) {
-          throw tErr;
-        }
-        console.warn('Backend tenant check skipped or unreachable:', tErr.message);
-      }
-
-      const sessionObj = { user: userData, profile: profileData, tenant: tenantData };
-      setUser(userData);
-      setProfile(profileData);
-      setTenant(tenantData);
-
+      localStorage.setItem('kos_jwt_token', data.token);
+      const sessionObj = {
+        user: data.user,
+        profile: data.profile,
+        tenant: data.tenant,
+        timestamp: new Date().toISOString()
+      };
       localStorage.setItem('saas_user_session', JSON.stringify(sessionObj));
-      return sessionObj;
+
+      setUser(data.user);
+      setProfile(data.profile);
+      setTenant(data.tenant);
+
+      return { user: data.user, profile: data.profile, tenant: data.tenant };
     } catch (err) {
+      console.error('Login error:', err);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut().catch(() => {});
-    } catch (e) {}
-
+  const logout = () => {
+    localStorage.removeItem('kos_jwt_token');
+    localStorage.removeItem('saas_user_session');
     setUser(null);
     setProfile(null);
     setTenant(null);
-    localStorage.removeItem('saas_user_session');
   };
 
-  const resetPassword = async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-    return true;
+  const value = {
+    user: user || { id: 'local-admin', email: 'admin@kos.local' },
+    profile: profile || { full_name: 'Operador Local' },
+    tenant: tenant || { id: '00000000-0000-0000-0000-000000000001', name: 'Lan 3JR' },
+    loading,
+    login,
+    logout,
+    apiBaseUrl: getSafeApiUrl()
   };
 
-  return (
-    <AuthContext.Provider value={{
-      user,
-      profile,
-      tenant,
-      loading,
-      login,
-      logout,
-      resetPassword,
-      isAuthenticated: !!user
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     return {
-      user: null,
-      profile: null,
-      tenant: null,
+      user: { id: 'local-admin', email: 'admin@kos.local' },
+      profile: { full_name: 'Operador Local' },
+      tenant: { id: '00000000-0000-0000-0000-000000000001', name: 'Lan 3JR' },
       loading: false,
       login: async () => {},
-      logout: async () => {},
-      resetPassword: async () => {},
-      isAuthenticated: false
+      logout: () => {},
+      apiBaseUrl: 'http://localhost:4000'
     };
   }
   return context;

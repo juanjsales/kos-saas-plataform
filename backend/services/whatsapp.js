@@ -2,13 +2,13 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  Browsers,
-  downloadMediaMessage
+  Browsers
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
-import { supabase } from '../config/supabase.js';
+import { prisma } from '../config/db.js';
+import { pathConfig } from '../config/pathConfig.js';
 
 /**
  * Multi-Tenant Session Registry: Maps tenantId -> { sock, status, lastQrData, qrCodeImage, isInitializing, initPromise }
@@ -138,97 +138,19 @@ export function extractWhatsAppMessageContent(msg) {
 }
 
 /**
- * Clears session credentials from Supabase DB and disk for a specific tenant
+ * Clears session credentials from DB and disk for a specific tenant
  */
 export async function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-000000000001') {
   try {
     console.log(`[WhatsApp Multi-Session] Clearing auth session for tenant ${tenantId}...`);
-    await supabase.from('whatsapp_sessions').delete().eq('tenant_id', tenantId);
+    await prisma.whatsAppSession.deleteMany({ where: { tenant_id: tenantId } });
 
-    const authFolder = `baileys_auth_info_${tenantId}`;
+    const authFolder = path.join(pathConfig.whatsappSessionsPath, `baileys_auth_${tenantId}`);
     if (fs.existsSync(authFolder)) {
       fs.rmSync(authFolder, { recursive: true, force: true });
     }
   } catch (err) {
     console.error('Error clearing auth folder:', err);
-  }
-}
-
-const syncDebounceTimers = new Map();
-
-/**
- * Debounced background backup of auth files to Supabase in a single batch query
- */
-function scheduleSyncAuthFolderToSupabase(tenantId) {
-  if (syncDebounceTimers.has(tenantId)) {
-    clearTimeout(syncDebounceTimers.get(tenantId));
-  }
-
-  const timer = setTimeout(async () => {
-    syncDebounceTimers.delete(tenantId);
-    try {
-      const authFolder = `baileys_auth_info_${tenantId}`;
-      if (!fs.existsSync(authFolder)) return;
-
-      const files = fs.readdirSync(authFolder);
-      if (files.length === 0) return;
-
-      const rowsToUpsert = [];
-      for (const file of files) {
-        const filePath = path.join(authFolder, file);
-        if (fs.statSync(filePath).isFile()) {
-          const content = fs.readFileSync(filePath, 'utf-8');
-          rowsToUpsert.push({
-            tenant_id: tenantId,
-            file_name: file,
-            file_data: content,
-            updated_at: new Date().toISOString()
-          });
-        }
-      }
-
-      if (rowsToUpsert.length > 0) {
-        await supabase
-          .from('whatsapp_sessions')
-          .upsert(rowsToUpsert, { onConflict: 'tenant_id,file_name' });
-      }
-    } catch (err) {
-      console.error(`[WhatsApp Multi-Session] Error auto-backing up session to Supabase for tenant ${tenantId}:`, err);
-    }
-  }, 1000);
-
-  syncDebounceTimers.set(tenantId, timer);
-}
-
-/**
- * Restore auth state folder from Supabase DB to local disk if missing
- */
-async function restoreAuthFolderFromSupabase(tenantId) {
-  const authFolder = `baileys_auth_info_${tenantId}`;
-  try {
-    const { data: rows, error } = await supabase
-      .from('whatsapp_sessions')
-      .select('file_name, file_data')
-      .eq('tenant_id', tenantId);
-
-    if (error || !rows || rows.length === 0) {
-      return false;
-    }
-
-    if (!fs.existsSync(authFolder)) {
-      fs.mkdirSync(authFolder, { recursive: true });
-    }
-
-    for (const row of rows) {
-      const filePath = path.join(authFolder, row.file_name);
-      fs.writeFileSync(filePath, row.file_data, 'utf-8');
-    }
-
-    console.log(`✅ [WhatsApp Multi-Session] Restored ${rows.length} session files from DB for Tenant ${tenantId}`);
-    return true;
-  } catch (err) {
-    console.error(`[WhatsApp Multi-Session] Error restoring auth session for tenant ${tenantId}:`, err);
-    return false;
   }
 }
 
@@ -241,8 +163,8 @@ export async function getOrEnsureValidTenant(reqTenantId) {
   }
 
   try {
-    const { data } = await supabase.from('tenants').select('id').limit(1).single();
-    if (data?.id) return data.id;
+    const tenant = await prisma.tenant.findFirst();
+    if (tenant?.id) return tenant.id;
   } catch (e) {}
 
   return '00000000-0000-0000-0000-000000000001';
@@ -317,11 +239,10 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
   const initTask = (async () => {
     try {
-      const authFolder = `baileys_auth_info_${activeTenantId}`;
+      const authFolder = path.join(pathConfig.whatsappSessionsPath, `baileys_auth_${activeTenantId}`);
 
-      // Restore folder from Supabase DB if missing from local disk
       if (!fs.existsSync(authFolder)) {
-        await restoreAuthFolderFromSupabase(activeTenantId);
+        fs.mkdirSync(authFolder, { recursive: true });
       }
 
       const { state, saveCreds } = await useMultiFileAuthState(authFolder);
@@ -360,7 +281,6 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
       sock.ev.on('creds.update', async () => {
         await saveCreds();
-        scheduleSyncAuthFolderToSupabase(activeTenantId);
       });
 
       sock.ev.on('connection.update', async (update) => {
@@ -392,9 +312,9 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
           if (isLoggedOut) {
             session.status = 'disconnected';
-            console.log(`[WhatsApp Multi-Session] Notice: Session for tenant ${activeTenantId} marked disconnected.`);
-            if (fs.existsSync(`baileys_auth_info_${activeTenantId}`)) {
-              try { fs.rmSync(`baileys_auth_info_${activeTenantId}`, { recursive: true, force: true }); } catch (e) {}
+            console.log(`[WhatsApp Multi-Session] Session marked disconnected for tenant ${activeTenantId}`);
+            if (fs.existsSync(authFolder)) {
+              try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
             }
           } else {
             session.status = 'connecting';
@@ -407,9 +327,7 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
           session.lastQrData = null;
           session.qrCodeImage = null;
           console.log(`✅ [WhatsApp Multi-Session] Engine connected for Tenant ${activeTenantId} (${sock.user?.name || sock.user?.id})!`);
-          scheduleSyncAuthFolderToSupabase(activeTenantId);
 
-          // Heartbeat KeepAlive: Keep session active
           try {
             await sock.sendPresenceUpdate('available');
           } catch (e) {}
@@ -421,10 +339,17 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
         for (const c of chatsList) {
           if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
           try {
-            const name = c.name || c.notify;
-            if (name) {
-              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
-            }
+            const name = c.name || c.notify || c.id.replace('@s.whatsapp.net', '');
+            await prisma.chat.upsert({
+              where: { id: c.id },
+              update: { contact_name: name, updated_at: new Date() },
+              create: {
+                id: c.id,
+                tenant_id: activeTenantId,
+                contact_name: name,
+                updated_at: new Date()
+              }
+            });
           } catch (e) {}
         }
       });
@@ -437,8 +362,8 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
             const name = c.name || c.notify;
             if (name) {
               const phone = c.id.replace('@s.whatsapp.net', '');
-              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
-              await supabase.from('contacts').update({ name: name }).eq('tenant_id', activeTenantId).eq('phone', phone);
+              await prisma.chat.updateMany({ where: { id: c.id }, data: { contact_name: name } });
+              await prisma.contact.updateMany({ where: { tenant_id: activeTenantId, phone: phone }, data: { name: name } });
             }
           } catch (e) {}
         }
@@ -451,8 +376,8 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
             const name = c.name || c.notify;
             if (name) {
               const phone = c.id.replace('@s.whatsapp.net', '');
-              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
-              await supabase.from('contacts').update({ name: name }).eq('tenant_id', activeTenantId).eq('phone', phone);
+              await prisma.chat.updateMany({ where: { id: c.id }, data: { contact_name: name } });
+              await prisma.contact.updateMany({ where: { tenant_id: activeTenantId, phone: phone }, data: { name: name } });
             }
           } catch (e) {}
         }
@@ -480,45 +405,49 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
           const contactName = msg.pushName || senderPhone;
           const timestampMs = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now();
-          const timestampIso = new Date(timestampMs).toISOString();
+          const timestampDate = new Date(timestampMs);
 
           try {
             const { processWhatsAppConsentKeywords } = await import('./whatsappOptOutService.js');
             await processWhatsAppConsentKeywords(activeTenantId, senderPhone, content);
 
-            // 1. Save chat & message IMMEDIATELY into Supabase with ZERO latency
-            await supabase
-              .from('chats')
-              .upsert({
+            // 1. Save chat, contact & message IMMEDIATELY into SQLite
+            await prisma.chat.upsert({
+              where: { id: remoteJid },
+              update: { contact_name: contactName, updated_at: timestampDate },
+              create: {
                 id: remoteJid,
                 tenant_id: activeTenantId,
                 contact_name: contactName,
-                updated_at: timestampIso
-              }, { onConflict: 'id' });
+                updated_at: timestampDate
+              }
+            });
 
-            await supabase
-              .from('contacts')
-              .upsert({
+            await prisma.contact.upsert({
+              where: { tenant_id_phone: { tenant_id: activeTenantId, phone: senderPhone } },
+              update: { name: contactName },
+              create: {
                 tenant_id: activeTenantId,
                 name: contactName,
                 phone: senderPhone
-              }, { onConflict: 'tenant_id,phone' });
+              }
+            });
 
-            await supabase
-              .from('messages')
-              .insert({
+            await prisma.message.create({
+              data: {
                 chat_id: remoteJid,
                 sender_phone: isFromMe ? 'System/Agent' : senderPhone,
                 content: content,
-                timestamp: timestampIso
-              });
+                timestamp: timestampDate
+              }
+            });
 
             // 2. Fetch profile picture asynchronously in background (Non-blocking)
             if (sock && typeof sock.profilePictureUrl === 'function') {
               sock.profilePictureUrl(remoteJid, 'image').then(async (url) => {
                 if (url) {
-                  await supabase.from('chats').update({ profile_picture_url: url }).eq('id', remoteJid);
-                  await supabase.from('contacts').update({ profile_picture_url: url }).eq('tenant_id', activeTenantId).eq('phone', senderPhone);
+                  await prisma.chat.updateMany({ where: { id: remoteJid }, data: { profile_picture_url: url } });
+                  await prisma.contact.updateMany({ where: { tenant_id: activeTenantId, phone: senderPhone }, data: { profile_picture_url: url } });
                 }
               }).catch(() => {});
             }
