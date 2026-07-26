@@ -322,31 +322,105 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
             continue;
           }
 
+// Robust WhatsApp Message Unpacker for all Baileys message types
+function extractWhatsAppMessageContent(msg) {
+  if (!msg || !msg.message) return null;
+
+  let m = msg.message;
+  if (m.ephemeralMessage?.message) m = m.ephemeralMessage.message;
+  if (m.viewOnceMessage?.message) m = m.viewOnceMessage.message;
+  if (m.viewOnceMessageV2?.message) m = m.viewOnceMessageV2.message;
+  if (m.documentWithCaptionMessage?.message) m = m.documentWithCaptionMessage.message;
+  if (m.editedMessage?.message) m = m.editedMessage.message;
+
+  // 1. Direct text message
+  if (m.conversation) return m.conversation;
+
+  // 2. Extended text message (replies, formatting, quotes)
+  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+
+  // 3. Image with caption or image tag
+  if (m.imageMessage) {
+    return m.imageMessage.caption ? `📷 ${m.imageMessage.caption}` : '📷 [Imagem]';
+  }
+
+  // 4. Video with caption or video tag
+  if (m.videoMessage) {
+    return m.videoMessage.caption ? `🎥 ${m.videoMessage.caption}` : '🎥 [Vídeo]';
+  }
+
+  // 5. Audio / Voice note
+  if (m.audioMessage) {
+    const isPtt = m.audioMessage.ptt ? 'Áudio de Voz' : 'Áudio';
+    return `🎵 [${isPtt}]`;
+  }
+
+  // 6. Document / File attachment
+  if (m.documentMessage) {
+    const fileName = m.documentMessage.fileName || 'Arquivo';
+    return m.documentMessage.caption ? `📄 ${m.documentMessage.caption} (${fileName})` : `📄 [Documento: ${fileName}]`;
+  }
+
+  // 7. Sticker
+  if (m.stickerMessage) return '🎨 [Figurinha]';
+
+  // 8. Contact card
+  if (m.contactMessage) {
+    const vcardName = m.contactMessage.displayName || 'Contato';
+    return `👤 [Contato: ${vcardName}]`;
+  }
+
+  // 9. Location
+  if (m.locationMessage || m.liveLocationMessage) {
+    const loc = m.locationMessage || m.liveLocationMessage;
+    const locName = loc.name || loc.address || 'Localização enviada';
+    return `📍 [${locName}]`;
+  }
+
+  // 10. Buttons Response
+  if (m.buttonsResponseMessage) {
+    return m.buttonsResponseMessage.selectedDisplayText || m.buttonsResponseMessage.selectedButtonId || '🔘 [Botão clicado]';
+  }
+
+  // 11. List Response
+  if (m.listResponseMessage) {
+    return m.listResponseMessage.title || m.listResponseMessage.singleSelectReply?.selectedRowId || '📋 [Opção selecionada]';
+  }
+
+  // 12. Template Button Reply
+  if (m.templateButtonReplyMessage) {
+    return m.templateButtonReplyMessage.selectedDisplayText || m.templateButtonReplyMessage.selectedId || '🔘 [Resposta de Botão]';
+  }
+
+  // 13. Interactive Response (Flows / Native Flow)
+  if (m.interactiveResponseMessage) {
+    try {
+      const params = JSON.parse(m.interactiveResponseMessage.nativeFlowResponseMessage?.paramsJson || '{}');
+      return m.interactiveResponseMessage.body?.text || params.id || '🔘 [Resposta Interativa]';
+    } catch (e) {
+      return '🔘 [Resposta Interativa]';
+    }
+  }
+
+  // 14. Emoji Reaction
+  if (m.reactionMessage) {
+    return `Reagiu ${m.reactionMessage.text || '👍'}`;
+  }
+
+  // Fallback scan for any nested text/caption
+  for (const key of Object.keys(m)) {
+    if (m[key]?.text && typeof m[key].text === 'string') return m[key].text;
+    if (m[key]?.caption && typeof m[key].caption === 'string') return m[key].caption;
+  }
+
+  return '[Mensagem no WhatsApp]';
+}
+
           const isFromMe = msg.key.fromMe;
           const senderPhone = remoteJid.replace('@s.whatsapp.net', '');
+          const content = extractWhatsAppMessageContent(msg);
 
-          // Unpack ephemeral / viewOnce wrapper if present
-          const m = msg.message?.ephemeralMessage?.message ||
-                    msg.message?.viewOnceMessage?.message ||
-                    msg.message?.viewOnceMessageV2?.message ||
-                    msg.message;
-
-          if (!m) continue;
-
-          const content =
-            m.conversation ||
-            m.extendedTextMessage?.text ||
-            m.imageMessage?.caption ||
-            m.videoMessage?.caption ||
-            m.documentMessage?.caption ||
-            (m.imageMessage ? '📷 [Imagem]' : null) ||
-            (m.videoMessage ? '🎥 [Vídeo]' : null) ||
-            (m.audioMessage ? '🎵 [Áudio]' : null) ||
-            (m.documentMessage ? '📄 [Documento]' : null) ||
-            (m.stickerMessage ? '🎨 [Sticker]' : null) ||
-            (m.contactMessage ? '👤 [Contato]' : null) ||
-            (m.locationMessage ? '📍 [Localização]' : null) ||
-            '[Mensagem no WhatsApp]';
+          if (!content) continue;
 
           const contactName = msg.pushName || senderPhone;
           const timestampMs = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now();
