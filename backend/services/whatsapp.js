@@ -2,7 +2,8 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  Browsers
+  Browsers,
+  downloadMediaMessage
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
@@ -23,321 +24,39 @@ export function formatToJid(phone) {
 }
 
 /**
- * Clears session credentials from Supabase DB and disk for a specific tenant
+ * Robust WhatsApp Message Unpacker for all Baileys message types
  */
-export async function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-000000000001') {
-  try {
-    console.log(`[WhatsApp Multi-Session] Clearing auth session for tenant ${tenantId}...`);
-    await supabase.from('whatsapp_sessions').delete().eq('tenant_id', tenantId);
+export function extractWhatsAppMessageContent(msg) {
+  if (!msg) return null;
 
-    const authFolder = `baileys_auth_info_${tenantId}`;
-    if (fs.existsSync(authFolder)) {
-      fs.rmSync(authFolder, { recursive: true, force: true });
-    }
-  } catch (err) {
-    console.error('Error clearing auth folder:', err);
-  }
-}
+  if (typeof msg === 'string') return msg.trim();
 
-const syncDebounceTimers = new Map();
+  let m = msg.message || msg;
 
-/**
- * Debounced background backup of auth files to Supabase in a single batch query
- */
-function scheduleSyncAuthFolderToSupabase(tenantId) {
-  if (syncDebounceTimers.has(tenantId)) {
-    clearTimeout(syncDebounceTimers.get(tenantId));
+  // Unpack all nested wrapper objects recursively up to 5 levels
+  let depth = 0;
+  while (m && depth < 5) {
+    if (m.ephemeralMessage?.message) { m = m.ephemeralMessage.message; depth++; continue; }
+    if (m.viewOnceMessage?.message) { m = m.viewOnceMessage.message; depth++; continue; }
+    if (m.viewOnceMessageV2?.message) { m = m.viewOnceMessageV2.message; depth++; continue; }
+    if (m.viewOnceMessageV2Extension?.message) { m = m.viewOnceMessageV2Extension.message; depth++; continue; }
+    if (m.documentWithCaptionMessage?.message) { m = m.documentWithCaptionMessage.message; depth++; continue; }
+    if (m.editedMessage?.message) { m = m.editedMessage.message; depth++; continue; }
+    if (m.deviceSentMessage?.message) { m = m.deviceSentMessage.message; depth++; continue; }
+    break;
   }
 
-  const timer = setTimeout(async () => {
-    const authFolder = `baileys_auth_info_${tenantId}`;
-    if (!fs.existsSync(authFolder)) return;
-
-    try {
-      const files = fs.readdirSync(authFolder);
-      const upserts = files
-        .map(fileName => {
-          const filePath = path.join(authFolder, fileName);
-          if (fs.lstatSync(filePath).isFile()) {
-            const fileContent = fs.readFileSync(filePath, 'utf8');
-            return {
-              tenant_id: tenantId,
-              data_key: fileName,
-              data_val: fileContent,
-              updated_at: new Date().toISOString()
-            };
-          }
-          return null;
-        })
-        .filter(Boolean);
-
-      if (upserts.length > 0) {
-        await supabase
-          .from('whatsapp_sessions')
-          .upsert(upserts, { onConflict: 'tenant_id,data_key' });
-      }
-    } catch (err) {
-      console.error(`Error backing up auth folder for tenant ${tenantId} to Supabase:`, err.message);
-    }
-  }, 1000);
-
-  syncDebounceTimers.set(tenantId, timer);
-}
-
-/**
- * Restores auth folder files from Supabase DB to local disk if missing
- */
-async function restoreAuthFolderFromSupabase(tenantId) {
-  const authFolder = `baileys_auth_info_${tenantId}`;
-  try {
-    const { data: dbFiles, error } = await supabase
-      .from('whatsapp_sessions')
-      .select('data_key, data_val')
-      .eq('tenant_id', tenantId);
-
-    if (error || !dbFiles || dbFiles.length === 0) return false;
-
-    if (!fs.existsSync(authFolder)) {
-      fs.mkdirSync(authFolder, { recursive: true });
-    }
-
-    for (const item of dbFiles) {
-      if (item.data_key && item.data_val) {
-        const filePath = path.join(authFolder, item.data_key);
-        fs.writeFileSync(filePath, item.data_val, 'utf8');
-      }
-    }
-
-    return true;
-  } catch (err) {
-    console.error(`Error restoring auth folder for tenant ${tenantId} from Supabase:`, err.message);
-    return false;
-  }
-}
-
-/**
- * Ensures a valid tenant exists in public.tenants table
- */
-export async function getOrEnsureValidTenant(requestedTenantId) {
-  if (requestedTenantId) {
-    return requestedTenantId;
-  }
-  return '00000000-0000-0000-0000-000000000001';
-}
-
-/**
- * Retrieves session data for a specific tenant
- */
-export function getTenantSession(tenantId = '00000000-0000-0000-0000-000000000001') {
-  if (!tenantSessions.has(tenantId)) {
-    tenantSessions.set(tenantId, {
-      sock: null,
-      status: 'disconnected',
-      lastQrData: null,
-      qrCodeImage: null,
-      isInitializing: false,
-      initPromise: null
-    });
-  }
-  return tenantSessions.get(tenantId);
-}
-
-/**
- * Automatically restores all active WhatsApp sessions from Supabase DB or disk on server startup
- */
-export async function autoRestoreActiveWhatsAppSessions() {
-  try {
-    const tenantIdsToRestore = new Set();
-
-    // 1. Fetch saved session tenant IDs from Supabase DB
-    const { data: dbSessions } = await supabase
-      .from('whatsapp_sessions')
-      .select('tenant_id');
-
-    if (dbSessions && dbSessions.length > 0) {
-      dbSessions.forEach(s => tenantIdsToRestore.add(s.tenant_id));
-    }
-
-    // 2. Check local disk fallback
-    if (fs.existsSync('.')) {
-      const files = fs.readdirSync('.');
-      const sessionFolders = files.filter(f => f.startsWith('baileys_auth_info_'));
-      sessionFolders.forEach(folder => {
-        const tid = folder.replace('baileys_auth_info_', '');
-        if (tid) tenantIdsToRestore.add(tid);
-      });
-    }
-
-    console.log(`🤖 [WhatsApp Multi-Session] Restoring ${tenantIdsToRestore.size} WhatsApp sessions...`);
-
-    for (const tenantId of tenantIdsToRestore) {
-      initWhatsAppEngine(tenantId).catch(err => {
-        console.error(`Error restoring WhatsApp session for tenant ${tenantId}:`, err);
-      });
-    }
-  } catch (err) {
-    console.error('Error auto restoring WhatsApp sessions:', err);
-  }
-}
-
-/**
- * Initializes an isolated Baileys WhatsApp Engine session per tenant with single-flight locking & fast zero-latency auth
- */
-export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
-  const session = getTenantSession(tenantId);
-
-  // Single-flight lock: If socket is already connected or currently initializing, reuse instance/promise
-  if (session.sock && (session.sock.user || session.qrCodeImage)) {
-    return session.sock;
-  }
-  if (session.isInitializing && session.initPromise) {
-    return session.initPromise;
-  }
-
-  session.isInitializing = true;
-  session.initPromise = (async () => {
-    try {
-      const activeTenantId = await getOrEnsureValidTenant(tenantId);
-      const authFolder = `baileys_auth_info_${activeTenantId}`;
-
-      // Restore folder from Supabase DB if missing from local disk
-      if (!fs.existsSync(authFolder)) {
-        await restoreAuthFolderFromSupabase(activeTenantId);
-      }
-
-      // Zero-latency local disk auth state for instant pairing
-      const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-
-      // Robust version fetch with 3s timeout & fallback
-      let version;
-      try {
-        const vData = await Promise.race([
-          fetchLatestBaileysVersion(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Version fetch timeout')), 3000))
-        ]);
-        version = vData.version;
-      } catch (e) {
-        version = [2, 3000, 1015901307];
-      }
-
-      const sock = makeWASocket({
-        version,
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu('Chrome'),
-        printQRInTerminal: false,
-        syncFullHistory: false,
-        markOnlineOnConnect: true,
-        keepAliveIntervalMs: 10000,
-        connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: undefined,
-        retryRequestDelayMs: 2000,
-        getMessage: async () => ({ conversation: '' })
-      });
-
-      session.sock = sock;
-      session.status = 'connecting';
-
-      sock.ev.on('creds.update', async () => {
-        await saveCreds();
-        scheduleSyncAuthFolderToSupabase(activeTenantId);
-      });
-
-      sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-          session.lastQrData = qr;
-          session.status = 'qr_ready';
-
-          try {
-            const qrcodeModule = await import('qrcode');
-            session.qrCodeImage = await qrcodeModule.default.toDataURL(qr);
-            console.log(`✅ [WhatsApp Multi-Session] Generated QR Code DataURL for Tenant ${activeTenantId}`);
-          } catch (err) {
-            console.error('Error generating QR DataURL:', err);
-            session.qrCodeImage = null;
-          }
-        }
-
-        if (connection === 'close') {
-          const statusCode = lastDisconnect?.error?.output?.statusCode;
-          const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
-          const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
-
-          console.log(`[WhatsApp Multi-Session] Tenant ${activeTenantId} connection closed (Status: ${statusCode}, RestartRequired: ${isRestartRequired}).`);
-
-          session.sock = null;
-          session.qrCodeImage = null;
-
-          if (isLoggedOut) {
-            session.status = 'disconnected';
-            console.log(`[WhatsApp Multi-Session] Notice: Session for tenant ${activeTenantId} marked disconnected. Preserving DB backup for cloud auto-recovery.`);
-            if (fs.existsSync(`baileys_auth_info_${activeTenantId}`)) {
-              try { fs.rmSync(`baileys_auth_info_${activeTenantId}`, { recursive: true, force: true }); } catch (e) {}
-            }
-          } else {
-            session.status = 'connecting';
-            setTimeout(() => {
-              initWhatsAppEngine(activeTenantId).catch(() => {});
-            }, isRestartRequired ? 500 : 2000);
-          }
-        } else if (connection === 'open') {
-          session.status = 'connected';
-          session.lastQrData = null;
-          session.qrCodeImage = null;
-          console.log(`✅ [WhatsApp Multi-Session] Engine connected for Tenant ${activeTenantId} (${sock.user?.name || sock.user?.id})!`);
-          scheduleSyncAuthFolderToSupabase(activeTenantId);
-        }
-      });
-
-      // Handle synced chats list from Baileys
-      sock.ev.on('chats.upsert', async (chatsList) => {
-        for (const c of chatsList) {
-          if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
-          try {
-            await supabase.from('chats').upsert({
-              id: c.id,
-              tenant_id: activeTenantId,
-              contact_name: c.name || c.id.replace('@s.whatsapp.net', ''),
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
-          } catch (e) {}
-        }
-      });
-
-      // Handle incoming & outgoing messages per tenant session
-      sock.ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
-        for (const msg of newMessages) {
-          const remoteJid = msg.key.remoteJid;
-
-          if (
-            !remoteJid ||
-            remoteJid.includes('@lid') ||
-            remoteJid === 'status@broadcast' ||
-            remoteJid.includes('@g.us') ||
-            remoteJid.endsWith('@status.whatsapp.net') ||
-            remoteJid.endsWith('@newsletter')
-          ) {
-            continue;
-          }
-
-// Robust WhatsApp Message Unpacker for all Baileys message types
-function extractWhatsAppMessageContent(msg) {
-  if (!msg || !msg.message) return null;
-
-  let m = msg.message;
-  if (m.ephemeralMessage?.message) m = m.ephemeralMessage.message;
-  if (m.viewOnceMessage?.message) m = m.viewOnceMessage.message;
-  if (m.viewOnceMessageV2?.message) m = m.viewOnceMessageV2.message;
-  if (m.documentWithCaptionMessage?.message) m = m.documentWithCaptionMessage.message;
-  if (m.editedMessage?.message) m = m.editedMessage.message;
+  if (!m) return null;
 
   // 1. Direct text message
-  if (m.conversation) return m.conversation;
+  if (typeof m.conversation === 'string' && m.conversation.trim()) {
+    return m.conversation.trim();
+  }
 
   // 2. Extended text message (replies, formatting, quotes)
-  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+  if (typeof m.extendedTextMessage?.text === 'string' && m.extendedTextMessage.text.trim()) {
+    return m.extendedTextMessage.text.trim();
+  }
 
   // 3. Image with caption or image tag
   if (m.imageMessage) {
@@ -407,14 +126,326 @@ function extractWhatsAppMessageContent(msg) {
     return `Reagiu ${m.reactionMessage.text || '👍'}`;
   }
 
-  // Fallback scan for any nested text/caption
-  for (const key of Object.keys(m)) {
-    if (m[key]?.text && typeof m[key].text === 'string') return m[key].text;
-    if (m[key]?.caption && typeof m[key].caption === 'string') return m[key].caption;
+  // Deep recursive key inspection for nested text/caption
+  for (const k of Object.keys(m)) {
+    if (!m[k] || typeof m[k] !== 'object') continue;
+    if (typeof m[k].text === 'string' && m[k].text.trim()) return m[k].text.trim();
+    if (typeof m[k].caption === 'string' && m[k].caption.trim()) return m[k].caption.trim();
+    if (typeof m[k].conversation === 'string' && m[k].conversation.trim()) return m[k].conversation.trim();
   }
 
-  return '[Mensagem no WhatsApp]';
+  return null;
 }
+
+/**
+ * Clears session credentials from Supabase DB and disk for a specific tenant
+ */
+export async function clearAuthInfoFolder(tenantId = '00000000-0000-0000-0000-000000000001') {
+  try {
+    console.log(`[WhatsApp Multi-Session] Clearing auth session for tenant ${tenantId}...`);
+    await supabase.from('whatsapp_sessions').delete().eq('tenant_id', tenantId);
+
+    const authFolder = `baileys_auth_info_${tenantId}`;
+    if (fs.existsSync(authFolder)) {
+      fs.rmSync(authFolder, { recursive: true, force: true });
+    }
+  } catch (err) {
+    console.error('Error clearing auth folder:', err);
+  }
+}
+
+const syncDebounceTimers = new Map();
+
+/**
+ * Debounced background backup of auth files to Supabase in a single batch query
+ */
+function scheduleSyncAuthFolderToSupabase(tenantId) {
+  if (syncDebounceTimers.has(tenantId)) {
+    clearTimeout(syncDebounceTimers.get(tenantId));
+  }
+
+  const timer = setTimeout(async () => {
+    syncDebounceTimers.delete(tenantId);
+    try {
+      const authFolder = `baileys_auth_info_${tenantId}`;
+      if (!fs.existsSync(authFolder)) return;
+
+      const files = fs.readdirSync(authFolder);
+      if (files.length === 0) return;
+
+      const rowsToUpsert = [];
+      for (const file of files) {
+        const filePath = path.join(authFolder, file);
+        if (fs.statSync(filePath).isFile()) {
+          const content = fs.readFileSync(filePath, 'utf-8');
+          rowsToUpsert.push({
+            tenant_id: tenantId,
+            file_name: file,
+            file_data: content,
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+
+      if (rowsToUpsert.length > 0) {
+        await supabase
+          .from('whatsapp_sessions')
+          .upsert(rowsToUpsert, { onConflict: 'tenant_id,file_name' });
+      }
+    } catch (err) {
+      console.error(`[WhatsApp Multi-Session] Error auto-backing up session to Supabase for tenant ${tenantId}:`, err);
+    }
+  }, 1000);
+
+  syncDebounceTimers.set(tenantId, timer);
+}
+
+/**
+ * Restore auth state folder from Supabase DB to local disk if missing
+ */
+async function restoreAuthFolderFromSupabase(tenantId) {
+  const authFolder = `baileys_auth_info_${tenantId}`;
+  try {
+    const { data: rows, error } = await supabase
+      .from('whatsapp_sessions')
+      .select('file_name, file_data')
+      .eq('tenant_id', tenantId);
+
+    if (error || !rows || rows.length === 0) {
+      return false;
+    }
+
+    if (!fs.existsSync(authFolder)) {
+      fs.mkdirSync(authFolder, { recursive: true });
+    }
+
+    for (const row of rows) {
+      const filePath = path.join(authFolder, row.file_name);
+      fs.writeFileSync(filePath, row.file_data, 'utf-8');
+    }
+
+    console.log(`✅ [WhatsApp Multi-Session] Restored ${rows.length} session files from DB for Tenant ${tenantId}`);
+    return true;
+  } catch (err) {
+    console.error(`[WhatsApp Multi-Session] Error restoring auth session for tenant ${tenantId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Returns default tenant ID or validates input tenant ID
+ */
+export async function getOrEnsureValidTenant(reqTenantId) {
+  if (reqTenantId && reqTenantId !== 'null' && reqTenantId !== 'undefined' && reqTenantId.trim() !== '') {
+    return reqTenantId.trim();
+  }
+
+  try {
+    const { data } = await supabase.from('tenants').select('id').limit(1).single();
+    if (data?.id) return data.id;
+  } catch (e) {}
+
+  return '00000000-0000-0000-0000-000000000001';
+}
+
+/**
+ * Returns session object for a given tenantId
+ */
+export function getWhatsAppSession(tenantId) {
+  return tenantSessions.get(tenantId) || null;
+}
+
+/**
+ * Sends a typing/recording presence update to WhatsApp contact
+ */
+export async function sendTypingPresence(tenantId, remoteJid, presenceState = 'composing') {
+  const session = tenantSessions.get(tenantId);
+  if (!session?.sock) return false;
+  try {
+    const jid = formatToJid(remoteJid);
+    await session.sock.sendPresenceUpdate(presenceState, jid);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Marks messages as read (Blue Double Check) for a contact
+ */
+export async function markMessageAsRead(tenantId, remoteJid, messageKeys = []) {
+  const session = tenantSessions.get(tenantId);
+  if (!session?.sock) return false;
+  try {
+    if (Array.isArray(messageKeys) && messageKeys.length > 0) {
+      await session.sock.readMessages(messageKeys);
+    } else {
+      await session.sock.readMessages([{ remoteJid: formatToJid(remoteJid), id: '', fromMe: false }]);
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Initializes or returns existing WhatsApp socket engine for a tenant
+ */
+export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001', forceReinit = false) {
+  const activeTenantId = await getOrEnsureValidTenant(tenantId);
+
+  if (tenantSessions.has(activeTenantId)) {
+    const existing = tenantSessions.get(activeTenantId);
+    if (!forceReinit && existing.status === 'connected' && existing.sock) {
+      return existing;
+    }
+    if (existing.isInitializing && existing.initPromise) {
+      return existing.initPromise;
+    }
+  }
+
+  const session = {
+    sock: null,
+    status: 'connecting',
+    lastQrData: null,
+    qrCodeImage: null,
+    isInitializing: true,
+    initPromise: null
+  };
+
+  tenantSessions.set(activeTenantId, session);
+
+  const initTask = (async () => {
+    try {
+      const authFolder = `baileys_auth_info_${activeTenantId}`;
+
+      // Restore folder from Supabase DB if missing from local disk
+      if (!fs.existsSync(authFolder)) {
+        await restoreAuthFolderFromSupabase(activeTenantId);
+      }
+
+      const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+
+      let version;
+      try {
+        const vData = await Promise.race([
+          fetchLatestBaileysVersion(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Version fetch timeout')), 3000))
+        ]);
+        version = vData.version;
+      } catch (e) {
+        version = [2, 3000, 1015901307];
+      }
+
+      const sock = makeWASocket({
+        version,
+        auth: state,
+        logger: pino({ level: 'silent' }),
+        browser: Browsers.ubuntu('Chrome'),
+        printQRInTerminal: false,
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
+        keepAliveIntervalMs: 15000,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: undefined,
+        retryRequestDelayMs: 500,
+        maxMsgRetryCount: 5,
+        getMessage: async (key) => {
+          return { conversation: 'Mensagem do WhatsApp' };
+        }
+      });
+
+      session.sock = sock;
+      session.status = 'connecting';
+
+      sock.ev.on('creds.update', async () => {
+        await saveCreds();
+        scheduleSyncAuthFolderToSupabase(activeTenantId);
+      });
+
+      sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+          session.lastQrData = qr;
+          session.status = 'qr_ready';
+
+          try {
+            const qrcodeModule = await import('qrcode');
+            session.qrCodeImage = await qrcodeModule.default.toDataURL(qr);
+            console.log(`✅ [WhatsApp Multi-Session] Generated QR Code DataURL for Tenant ${activeTenantId}`);
+          } catch (err) {
+            console.error('Error generating QR DataURL:', err);
+            session.qrCodeImage = null;
+          }
+        }
+
+        if (connection === 'close') {
+          const statusCode = lastDisconnect?.error?.output?.statusCode;
+          const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+          const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
+
+          console.log(`[WhatsApp Multi-Session] Tenant ${activeTenantId} connection closed (Status: ${statusCode}, RestartRequired: ${isRestartRequired}).`);
+
+          session.sock = null;
+          session.qrCodeImage = null;
+
+          if (isLoggedOut) {
+            session.status = 'disconnected';
+            console.log(`[WhatsApp Multi-Session] Notice: Session for tenant ${activeTenantId} marked disconnected.`);
+            if (fs.existsSync(`baileys_auth_info_${activeTenantId}`)) {
+              try { fs.rmSync(`baileys_auth_info_${activeTenantId}`, { recursive: true, force: true }); } catch (e) {}
+            }
+          } else {
+            session.status = 'connecting';
+            setTimeout(() => {
+              initWhatsAppEngine(activeTenantId).catch(() => {});
+            }, isRestartRequired ? 500 : 2000);
+          }
+        } else if (connection === 'open') {
+          session.status = 'connected';
+          session.lastQrData = null;
+          session.qrCodeImage = null;
+          console.log(`✅ [WhatsApp Multi-Session] Engine connected for Tenant ${activeTenantId} (${sock.user?.name || sock.user?.id})!`);
+          scheduleSyncAuthFolderToSupabase(activeTenantId);
+
+          // Heartbeat KeepAlive: Keep session active
+          try {
+            await sock.sendPresenceUpdate('available');
+          } catch (e) {}
+        }
+      });
+
+      // Handle synced chats list from Baileys
+      sock.ev.on('chats.upsert', async (chatsList) => {
+        for (const c of chatsList) {
+          if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
+          try {
+            await supabase.from('chats').upsert({
+              id: c.id,
+              tenant_id: activeTenantId,
+              contact_name: c.name || c.id.replace('@s.whatsapp.net', ''),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+          } catch (e) {}
+        }
+      });
+
+      // Handle incoming & outgoing messages per tenant session
+      sock.ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
+        for (const msg of newMessages) {
+          const remoteJid = msg.key.remoteJid;
+
+          if (
+            !remoteJid ||
+            remoteJid.includes('@lid') ||
+            remoteJid === 'status@broadcast' ||
+            remoteJid.includes('@g.us') ||
+            remoteJid.endsWith('@status.whatsapp.net') ||
+            remoteJid.endsWith('@newsletter')
+          ) {
+            continue;
+          }
 
           const isFromMe = msg.key.fromMe;
           const senderPhone = remoteJid.replace('@s.whatsapp.net', '');
@@ -473,107 +504,28 @@ function extractWhatsAppMessageContent(msg) {
         }
       });
 
-      return sock;
-
+      return session;
     } finally {
       session.isInitializing = false;
-      session.initPromise = null;
     }
   })();
 
-  return session.initPromise;
+  session.initPromise = initTask;
+  return initTask;
 }
 
 /**
- * Outbound WhatsApp message dispatcher with multi-tenant session fallback
+ * Sends a text message over WhatsApp socket
  */
-export async function sendWhatsAppMessage(recipientPhone, content, tenantId = '00000000-0000-0000-0000-000000000001') {
-  let activeSock = null;
-  const realTenantId = await getOrEnsureValidTenant(tenantId);
+export async function sendWhatsAppMessage(tenantId, phone, messageText) {
+  const activeTenantId = await getOrEnsureValidTenant(tenantId);
+  const session = await initWhatsAppEngine(activeTenantId);
 
-  // Helper to wait up to 5 seconds for a connecting socket to open
-  const waitForSocket = async (targetId) => {
-    const s = getTenantSession(targetId);
-    if (s.sock?.user) return s.sock;
-    if (s.status === 'connected' && s.sock) return s.sock;
-
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 250));
-      if (s.sock?.user) return s.sock;
-      if (s.status === 'connected' && s.sock) return s.sock;
-    }
-    return s.sock || null;
-  };
-
-  // 1. Check requested tenant session
-  activeSock = await waitForSocket(realTenantId);
-
-  // 2. Attempt fast auto-restore if missing from memory
-  if (!activeSock?.user) {
-    try {
-      const sock = await initWhatsAppEngine(realTenantId);
-      if (sock) {
-        activeSock = await waitForSocket(realTenantId);
-      }
-    } catch (e) {}
+  if (!session?.sock || session.status !== 'connected') {
+    throw new Error(`WhatsApp do tenant ${activeTenantId} não está conectado no momento. Por favor, leia o QR Code no painel.`);
   }
 
-  if (!activeSock || !activeSock.user) {
-    console.warn(`[WhatsApp Dispatcher] Notice: Cannot send message to ${recipientPhone}. No active WhatsApp session connected for tenant ${tenantId}.`);
-    return { success: false, reason: 'whatsapp_not_connected' };
-  }
-
-  const jid = formatToJid(recipientPhone);
-  const result = await activeSock.sendMessage(jid, { text: content });
-  return { success: true, result };
-}
-
-/**
- * Gets session status and QR code image for a specific tenant
- */
-export function getWhatsAppSessionStatus(tenantId = '00000000-0000-0000-0000-000000000001') {
-  const session = getTenantSession(tenantId);
-  const isConnected = session.status === 'connected' || !!session.sock?.user;
-
-  return {
-    connected: isConnected,
-    user: session.sock?.user || null,
-    status: isConnected ? 'connected' : session.status,
-    qrCode: isConnected ? null : session.qrCodeImage
-  };
-}
-
-/**
- * Logs out and disconnects WhatsApp session for a specific tenant
- */
-export async function logoutWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000000000001') {
-  try {
-    const activeTenantId = await getOrEnsureValidTenant(tenantId);
-
-    // Logout all active sessions in memory
-    for (const [id, session] of tenantSessions.entries()) {
-      if (session.sock) {
-        console.log(`[WhatsApp Multi-Session] Logging out session for tenant ${id}...`);
-        await session.sock.logout().catch(() => {});
-        session.sock.ev.removeAllListeners('connection.update');
-        session.sock.ev.removeAllListeners('messages.upsert');
-        session.sock.ev.removeAllListeners('creds.update');
-        try { session.sock.end(new Error('Manual Tenant Disconnect')); } catch(e) {}
-        session.sock = null;
-      }
-      session.status = 'disconnected';
-      session.lastQrData = null;
-      session.qrCodeImage = null;
-      await clearAuthInfoFolder(id);
-    }
-
-    await clearAuthInfoFolder(activeTenantId);
-    await supabase.from('whatsapp_sessions').delete().neq('data_key', 'keep_table');
-    tenantSessions.clear();
-
-    return { success: true };
-  } catch (err) {
-    console.error(`Error logging out WhatsApp:`, err);
-    return { success: false, error: err.message };
-  }
+  const jid = formatToJid(phone);
+  const result = await session.sock.sendMessage(jid, { text: messageText });
+  return result;
 }
