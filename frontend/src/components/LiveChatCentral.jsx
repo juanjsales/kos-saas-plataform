@@ -38,6 +38,50 @@ const getContactDisplayInfo = (chat) => {
   return { title, subtext, initial, phoneFormatted, isNameOnlyPhone };
 };
 
+// Web Audio API Synthesizer Sound Chime (No external mp3 assets needed)
+const playNotificationSound = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    osc2.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.12);
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.12);
+    osc2.start(ctx.currentTime + 0.12);
+    osc2.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+};
+
+// Browser Push Notification Trigger
+const triggerBrowserNotification = (title, body, iconUrl) => {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: iconUrl || '/pwa-192x192.png',
+        tag: 'kos-new-message'
+      });
+    }
+  } catch (e) {}
+};
+
 export function LiveChatCentral({ tenantId, apiBaseUrl }) {
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -155,6 +199,13 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const newMsg = payload.new;
+          if (newMsg.sender_phone !== 'System/Agent') {
+            playNotificationSound();
+            const senderChat = chats.find(c => c.id === newMsg.chat_id);
+            const info = getContactDisplayInfo(senderChat || { id: newMsg.chat_id });
+            triggerBrowserNotification(`💬 Nova mensagem de ${info.title}`, newMsg.content, senderChat?.profile_picture_url);
+          }
+
           if (selectedChat && newMsg.chat_id === selectedChat.id) {
             setMessages((prev) => [...prev, newMsg]);
           }
@@ -356,6 +407,20 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
             </div>
 
             <div className="wa-header-actions" style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn-icon"
+                onClick={() => {
+                  playNotificationSound();
+                  if ('Notification' in window && Notification.permission !== 'granted') {
+                    Notification.requestPermission();
+                  }
+                  triggerBrowserNotification('🔔 Notificações Ativadas!', 'Você receberá avisos sonoros e pop-ups quando chegarem novas mensagens.');
+                }}
+                title="Testar Som / Ativar Notificações"
+                style={{ padding: '8px', borderRadius: '8px', color: '#10b981' }}
+              >
+                <Bell size={18} />
+              </button>
               <button className="btn-icon" onClick={fetchChats} title="Atualizar Conversas" style={{ padding: '8px', borderRadius: '8px' }}>
                 <RefreshCw size={18} />
               </button>
