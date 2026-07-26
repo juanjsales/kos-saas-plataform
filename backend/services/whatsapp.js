@@ -421,12 +421,39 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
         for (const c of chatsList) {
           if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
           try {
-            await supabase.from('chats').upsert({
-              id: c.id,
-              tenant_id: activeTenantId,
-              contact_name: c.name || c.id.replace('@s.whatsapp.net', ''),
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
+            const name = c.name || c.notify;
+            if (name) {
+              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
+            }
+          } catch (e) {}
+        }
+      });
+
+      // Handle synced contacts and pushNames from Baileys
+      sock.ev.on('contacts.upsert', async (contactsList) => {
+        for (const c of contactsList) {
+          if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
+          try {
+            const name = c.name || c.notify;
+            if (name) {
+              const phone = c.id.replace('@s.whatsapp.net', '');
+              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
+              await supabase.from('contacts').update({ name: name }).eq('tenant_id', activeTenantId).eq('phone', phone);
+            }
+          } catch (e) {}
+        }
+      });
+
+      sock.ev.on('contacts.update', async (updates) => {
+        for (const c of updates) {
+          if (!c.id || c.id.includes('@lid') || c.id.includes('status@broadcast') || c.id.includes('@g.us')) continue;
+          try {
+            const name = c.name || c.notify;
+            if (name) {
+              const phone = c.id.replace('@s.whatsapp.net', '');
+              await supabase.from('chats').update({ contact_name: name }).eq('id', c.id);
+              await supabase.from('contacts').update({ name: name }).eq('tenant_id', activeTenantId).eq('phone', phone);
+            }
           } catch (e) {}
         }
       });
