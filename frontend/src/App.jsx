@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, MessageSquare, Bell, LayoutGrid, Sparkles, Building, QrCode, CheckCircle2, AlertCircle, X, HelpCircle, ShieldAlert, Users, Palette, Shield, LogOut, UserCheck } from 'lucide-react';
+import {
+  Layers, MessageSquare, Bell, LayoutGrid, Sparkles, Building, QrCode, CheckCircle2,
+  AlertCircle, X, HelpCircle, ShieldAlert, Users, Palette, Shield, LogOut, UserCheck,
+  Columns, Maximize2, Split
+} from 'lucide-react';
 import { ServiceBuilder } from './components/ServiceBuilder';
 import { LiveChatCentral } from './components/LiveChatCentral';
 import { NotificationSettings } from './components/NotificationSettings';
@@ -22,7 +26,8 @@ function AppContent() {
   const userRole = profile?.role || 'tenant_operator';
   const isSuperAdmin = userRole === 'super_admin';
 
-  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'super_admin' : 'kanban');
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'super_admin' : 'workspace');
+  const [workspaceMode, setWorkspaceMode] = useState('split'); // 'split', 'kanban_full', 'chat_full'
   const [tenantId, setTenantId] = useState(profile?.tenant_id || '00000000-0000-0000-0000-000000000001');
 
   const [showQrModal, setShowQrModal] = useState(false);
@@ -116,7 +121,8 @@ function AppContent() {
     } else if (target === 'services') {
       setActiveTab('services');
     } else if (target === 'kanban') {
-      setActiveTab('kanban');
+      setActiveTab('workspace');
+      setWorkspaceMode('kanban_full');
     }
   };
 
@@ -246,21 +252,15 @@ function AppContent() {
               </button>
             </>
           ) : (
-            /* Tenant Admin & Operators see Operational Tabs */
+            /* Tenant Admin & Operators see Integrated Operational Tabs */
             <>
               <button
                 id="tour-kanban-board"
-                className={`tab-btn ${activeTab === 'kanban' ? 'active' : ''}`}
-                onClick={() => setActiveTab('kanban')}
+                className={`tab-btn ${activeTab === 'workspace' ? 'active' : ''}`}
+                onClick={() => setActiveTab('workspace')}
+                style={{ fontWeight: '800' }}
               >
-                <LayoutGrid size={18} /> 1. Quadro de Pedidos
-              </button>
-
-              <button
-                className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveTab('chat')}
-              >
-                <MessageSquare size={18} /> 2. Conversas no WhatsApp
+                <Split size={18} /> Central One-Screen (Lado a Lado)
               </button>
 
               {userRole === 'tenant_admin' && (
@@ -268,7 +268,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`}
                   onClick={() => setActiveTab('services')}
                 >
-                  <Layers size={18} /> 3. Serviços
+                  <Layers size={18} /> Serviços
                 </button>
               )}
 
@@ -277,7 +277,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
                   onClick={() => setActiveTab('notifications')}
                 >
-                  <Bell size={18} /> 4. Lembretes e Avisos
+                  <Bell size={18} /> Lembretes e Avisos
                 </button>
               )}
 
@@ -286,7 +286,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'team' ? 'active' : ''}`}
                   onClick={() => setActiveTab('team')}
                 >
-                  <Users size={18} /> 5. Nossa Equipe
+                  <Users size={18} /> Nossa Equipe
                 </button>
               )}
 
@@ -316,28 +316,70 @@ function AppContent() {
             </>
           ) : (
             <>
-              {activeTab === 'kanban' && (
-                <KanbanBoard tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
-              )}
+              {/* UNIFIED ONE-SCREEN WORKSPACE (SPLIT-SCREEN VIEW) */}
+              {activeTab === 'workspace' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Mode Selector Sub-header */}
+                  <div className="glass-card" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Split size={20} className="accent-icon" />
+                      <h3 style={{ fontSize: '0.98rem', margin: 0, fontWeight: '800' }}>Central Integrada One-Screen</h3>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>— Kanban e Chat do WhatsApp operando juntos na mesma tela</span>
+                    </div>
 
-              {activeTab === 'chat' && (
-                <LiveChatCentral tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className={`btn ${workspaceMode === 'split' ? 'primary' : 'secondary'}`}
+                        onClick={() => setWorkspaceMode('split')}
+                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Split size={14} /> 📊 Lado a Lado (50/50)
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`btn ${workspaceMode === 'kanban_full' ? 'primary' : 'secondary'}`}
+                        onClick={() => setWorkspaceMode('kanban_full')}
+                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <LayoutGrid size={14} /> 📌 Apenas Kanban
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`btn ${workspaceMode === 'chat_full' ? 'primary' : 'secondary'}`}
+                        onClick={() => setWorkspaceMode('chat_full')}
+                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <MessageSquare size={14} /> 💬 Apenas Conversas
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* The Split Container */}
+                  <div className={`one-screen-workspace mode-${workspaceMode}`}>
+                    <div className="one-screen-kanban-col">
+                      <KanbanBoard tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
+                    </div>
+
+                    <div className="one-screen-chat-col">
+                      <LiveChatCentral tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
+                    </div>
+                  </div>
+                </div>
               )}
 
               {activeTab === 'services' && (
-                <ProtectedRoute allowedRoles={['tenant_admin']} apiBaseUrl={API_BASE_URL}>
-                  <ServiceBuilder tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
-                </ProtectedRoute>
+                <ServiceBuilder tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
               )}
 
               {activeTab === 'notifications' && (
-                <ProtectedRoute allowedRoles={['tenant_admin']} apiBaseUrl={API_BASE_URL}>
-                  <NotificationSettings tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
-                </ProtectedRoute>
+                <NotificationSettings tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
               )}
 
               {activeTab === 'team' && (
-                <ProtectedRoute allowedRoles={['tenant_admin']} apiBaseUrl={API_BASE_URL}>
+                <ProtectedRoute allowedRoles={['tenant_admin', 'super_admin']} apiBaseUrl={API_BASE_URL}>
                   <TeamManagement tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
                 </ProtectedRoute>
               )}
@@ -348,87 +390,83 @@ function AppContent() {
             </>
           )}
         </section>
-
-        {/* Plain Language Footer */}
-        <footer style={{ textAlign: 'center', padding: '16px', fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-glass)' }}>
-          <span>Sistema Fácil de Atendimento © 2026. Todos os seus dados estão seguros. </span>
-          <button
-            type="button"
-            onClick={() => setShowLgpdModal(true)}
-            style={{ background: 'none', border: 'none', color: 'var(--primary-accent)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontWeight: '600' }}
-          >
-            🔒 Proteção dos Seus Dados e Privacidade
-          </button>
-        </footer>
       </main>
 
-      {/* LGPD Modal */}
-      {showLgpdModal && (
-        <LgpdTermsModal onClose={() => setShowLgpdModal(false)} />
-      )}
-
-      {/* WhatsApp Connection Modal */}
+      {/* WhatsApp QR Code & Disconnect Control Modal */}
       {showQrModal && (
         <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ textAlign: 'center', position: 'relative' }}>
-            <button className="btn-icon modal-close-btn" onClick={() => setShowQrModal(false)}>
-              <X size={20} />
-            </button>
-
-            <h3><QrCode size={24} className="accent-icon" /> Conectar seu WhatsApp ao Sistema</h3>
-            <p style={{ margin: '12px 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              {waStatus.connected
-                ? 'Seu WhatsApp já está conectado e enviando mensagens sozinho!'
-                : 'Abra o aplicativo do WhatsApp no seu celular > Toque nos 3 pontinhos (ou Configurações) > Aparelhos Conectados > E aponte a câmera para a imagem abaixo:'}
-            </p>
+          <div className="modal-content glass-card" style={{ maxWidth: '440px', padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={24} className="accent-icon" /> Conexão do WhatsApp
+              </h3>
+              <button className="btn-icon" onClick={() => setShowQrModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
 
             {waStatus.connected ? (
-              <div className="qr-connected-box">
-                <CheckCircle2 size={64} style={{ color: 'var(--secondary-accent)', margin: '16px auto' }} />
-                <h4>WhatsApp Prontinho e Conectado!</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Aparelho Ativo no Sistema
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <CheckCircle2 size={64} style={{ color: '#10b981', margin: '0 auto 16px' }} />
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>WhatsApp Conectado e Ativo! 🎉</h4>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                  Sua empresa já está pronta para enviar avisos automáticos e interagir com clientes no Kanban.
                 </p>
-              </div>
-            ) : waStatus.qrCode ? (
-              <div className="qr-code-box" style={{ background: '#fff', padding: '16px', borderRadius: '12px', display: 'inline-block', margin: '16px 0' }}>
-                <img src={waStatus.qrCode} alt="Código para conectar WhatsApp" style={{ width: '220px', height: '220px' }} />
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button className="btn secondary" onClick={() => setShowQrModal(false)}>
+                    Fechar
+                  </button>
+                  <button className="btn danger" onClick={handleDisconnectWa}>
+                    Desconectar WhatsApp
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="qr-loading-box" style={{ padding: '32px 0' }}>
-                <AlertCircle size={40} style={{ color: 'var(--primary-accent)', margin: '0 auto 12px' }} />
-                <p>Aguarde um momentinho... Gerando a imagem de conexão.</p>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                  Abra o WhatsApp no seu celular, acesse <strong>Aparelhos Conectados</strong> e aponte a câmera para a imagem abaixo:
+                </p>
+
+                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '16px', display: 'inline-block', marginBottom: '20px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-md)' }}>
+                  {waStatus.qrCodeImage ? (
+                    <img src={waStatus.qrCodeImage} alt="QR Code WhatsApp" style={{ width: '220px', height: '220px', display: 'block' }} />
+                  ) : (
+                    <div style={{ width: '220px', height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                      <QrCode size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                      <span style={{ fontSize: '0.85rem' }}>Gerando QR Code...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                  <button className="btn secondary" onClick={() => checkWaStatus(true)}>
+                    <RefreshCw size={16} /> Atualizar QR Code
+                  </button>
+                  <button className="btn secondary" onClick={() => setShowQrModal(false)}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
-
-            <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button className="btn secondary" onClick={() => setShowQrModal(false)}>Voltar sem salvar</button>
-              {waStatus.connected && (
-                <button className="btn danger" onClick={handleDisconnectWa}>
-                  🔴 Desligar WhatsApp deste Sistema
-                </button>
-              )}
-            </div>
           </div>
         </div>
+      )}
+
+      {/* LGPD Terms Modal */}
+      {showLgpdModal && (
+        <LgpdTermsModal onClose={() => setShowLgpdModal(false)} />
       )}
     </div>
   );
 }
 
 export default function App() {
-  const rawUrl = import.meta.env.VITE_API_URL || 'https://kos-backend-tuqi.onrender.com';
-  const API_BASE_URL = (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')))
-    ? 'https://kos-backend-tuqi.onrender.com'
-    : rawUrl;
-
   return (
-    <AuthProvider apiBaseUrl={API_BASE_URL}>
-      <ThemeProvider apiBaseUrl={API_BASE_URL}>
-        <ProtectedRoute apiBaseUrl={API_BASE_URL}>
-          <AppContent />
-        </ProtectedRoute>
-      </ThemeProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

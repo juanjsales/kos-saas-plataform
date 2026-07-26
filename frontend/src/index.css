@@ -1204,3 +1204,39 @@ input:checked + .slider:before {
     padding: 8px;
   }
 }
+
+/* ==========================================================================
+   ONE-SCREEN UNIFIED WORKSPACE STYLING (SPLIT-SCREEN VIEW)
+   ========================================================================== */
+
+.one-screen-workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  align-items: start;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.one-screen-workspace.mode-kanban_full {
+  grid-template-columns: 1fr;
+}
+
+.one-screen-workspace.mode-kanban_full .one-screen-chat-col {
+  display: none;
+}
+
+.one-screen-workspace.mode-chat_full {
+  grid-template-columns: 1fr;
+}
+
+.one-screen-workspace.mode-chat_full .one-screen-kanban-col {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .one-screen-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
