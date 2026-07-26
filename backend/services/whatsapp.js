@@ -27,9 +27,9 @@ export function formatToJid(phone) {
  * Robust WhatsApp Message Unpacker for all Baileys message types
  */
 export function extractWhatsAppMessageContent(msg) {
-  if (!msg) return null;
+  if (!msg) return '[Mensagem no WhatsApp]';
 
-  if (typeof msg === 'string') return msg.trim();
+  if (typeof msg === 'string') return msg.trim() || '[Mensagem no WhatsApp]';
 
   let m = msg.message || msg;
 
@@ -46,7 +46,7 @@ export function extractWhatsAppMessageContent(msg) {
     break;
   }
 
-  if (!m) return null;
+  if (!m) return '[Mensagem no WhatsApp]';
 
   // 1. Direct text message
   if (typeof m.conversation === 'string' && m.conversation.trim()) {
@@ -134,7 +134,7 @@ export function extractWhatsAppMessageContent(msg) {
     if (typeof m[k].conversation === 'string' && m[k].conversation.trim()) return m[k].conversation.trim();
   }
 
-  return null;
+  return '[Mensagem no WhatsApp]';
 }
 
 /**
@@ -449,9 +449,7 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
           const isFromMe = msg.key.fromMe;
           const senderPhone = remoteJid.replace('@s.whatsapp.net', '');
-          const content = extractWhatsAppMessageContent(msg);
-
-          if (!content) continue;
+          const content = extractWhatsAppMessageContent(msg) || '[Mensagem no WhatsApp]';
 
           const contactName = msg.pushName || senderPhone;
           const timestampMs = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now();
