@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Save, Power, CheckCircle, Info, Eye, ChevronDown, ChevronUp, FileText, Scan, Calendar, CreditCard, Sparkles, Layers } from 'lucide-react';
+import { Bell, Save, Power, CheckCircle, Info, Eye, ChevronDown, ChevronUp, FileText, Scan, Calendar, CreditCard, Sparkles, Layers, MessageSquare, X } from 'lucide-react';
 import { ServiceConfirmationModal } from './ServiceConfirmationModal';
 
 export function NotificationSettings({ tenantId, apiBaseUrl }) {
@@ -9,6 +9,7 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
+  const [activeWaPreview, setActiveWaPreview] = useState(null); // { title, templateText, serviceTitle }
 
   const fetchServicesAndRules = async () => {
     try {
@@ -50,7 +51,8 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
       contacts: { name: 'João Silva (Cliente Exemplo)', phone: '5511999999999' },
       services: {
         title: service.title || 'Serviço Selecionado',
-        completion_type: service.completion_type || 'document_delivery',
+        ocr_enabled: service.ocr_enabled !== false,
+        ocr_fields: service.ocr_fields || ['protocol_number', 'document_date', 'full_name', 'cpf', 'total_value'],
         confirmation_template: templateBody || service.confirmation_template || 'Olá {contact_name}, seu agendamento para *{service_title}* foi confirmado com sucesso!'
       },
       collected_data: { 'Exemplo': 'Teste de preenchimento' }
@@ -62,7 +64,7 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
     <div className="notification-settings-container glass-card">
       <div className="section-header">
         <h2><Bell size={26} className="accent-icon" /> Lembretes, Avisos e Confirmação de Atendimento por Serviço</h2>
-        <p>Configure e teste o modelo do modal de conclusão, a leitura inteligente de OCR e os avisos do WhatsApp para cada serviço da sua empresa.</p>
+        <p>Configure e teste a leitura inteligente de OCR e os avisos do WhatsApp para cada etapa de cada serviço da sua empresa.</p>
       </div>
 
       {message && (
@@ -113,6 +115,7 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
               tenantId={tenantId}
               onRefresh={fetchServicesAndRules}
               onPreviewModal={(tmpl) => handleOpenPreviewModal(service, tmpl)}
+              onPreviewWaMessage={(title, text) => setActiveWaPreview({ title, templateText: text, serviceTitle: service.title })}
               setMessage={setMessage}
             />
           ))}
@@ -128,12 +131,21 @@ export function NotificationSettings({ tenantId, apiBaseUrl }) {
           onClose={() => setPreviewCard(null)}
         />
       )}
+
+      {/* Generic WhatsApp Message Live Preview Modal */}
+      {activeWaPreview && (
+        <WhatsAppPreviewModal
+          title={activeWaPreview.title}
+          templateText={activeWaPreview.templateText}
+          serviceTitle={activeWaPreview.serviceTitle}
+          onClose={() => setActiveWaPreview(null)}
+        />
+      )}
     </div>
   );
 }
 
-function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiBaseUrl, tenantId, onRefresh, onPreviewModal, setMessage }) {
-  const [completionType, setCompletionType] = useState(service.completion_type || 'document_delivery');
+function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiBaseUrl, tenantId, onRefresh, onPreviewModal, onPreviewWaMessage, setMessage }) {
   const [ocrEnabled, setOcrEnabled] = useState(service.ocr_enabled !== false);
   const [ocrFields, setOcrFields] = useState(service.ocr_fields || ['protocol_number', 'document_date', 'full_name', 'cpf', 'total_value']);
   const [loading, setLoading] = useState(false);
@@ -154,7 +166,6 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
   const [cancelledText, setCancelledText] = useState(getRule('status_cancelled').template_body || 'Olá {contact_name}, seu atendimento de *{service_title}* foi cancelado.');
 
   useEffect(() => {
-    setCompletionType(service.completion_type || 'document_delivery');
     setOcrEnabled(service.ocr_enabled !== false);
     setOcrFields(service.ocr_fields || ['protocol_number', 'document_date', 'full_name', 'cpf', 'total_value']);
     setCreatedActive(getRule('card_created').is_active);
@@ -182,7 +193,7 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
       const triggersToSave = [
         { trigger_event: 'card_created', is_active: createdActive, template_body: createdText },
         { trigger_event: 'status_in_progress', is_active: progressActive, template_body: progressText },
-        { trigger_event: 'status_completed', is_active: completedActive, template_body: completedText, completion_type: completionType, ocr_enabled: ocrEnabled, ocr_fields: ocrFields },
+        { trigger_event: 'status_completed', is_active: completedActive, template_body: completedText, ocr_enabled: ocrEnabled, ocr_fields: ocrFields },
         { trigger_event: 'status_cancelled', is_active: cancelledActive, template_body: cancelledText }
       ];
 
@@ -198,7 +209,6 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
             trigger_event: item.trigger_event,
             is_active: item.is_active,
             template_body: item.template_body,
-            completion_type: item.completion_type,
             ocr_enabled: item.ocr_enabled,
             ocr_fields: item.ocr_fields
           })
@@ -213,7 +223,6 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
           tenant_id: tenantId,
           title: service.title,
           description: service.description,
-          completion_type: completionType,
           confirmation_template: completedText,
           ocr_enabled: ocrEnabled,
           ocr_fields: ocrFields
@@ -310,7 +319,7 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
             )}
           </div>
 
-          {/* SECTION 2: MENSAGENS DAS ETAPAS DO WHATSAPP */}
+          {/* SECTION 2: MENSAGENS DAS ETAPAS DO WHATSAPP COM BOTÃO DE PRÉVIA EM TODAS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* 1. Novo Pedido */}
             <div className="rule-card glass-subcard" style={{ padding: '16px', borderRadius: '12px' }}>
@@ -327,6 +336,16 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                 onChange={(e) => setCreatedText(e.target.value)}
                 rows={2}
               />
+              <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => onPreviewWaMessage('Novo Pedido Aberto', createdText)}
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <Eye size={14} /> 👁️ Ver Prévia do WhatsApp
+                </button>
+              </div>
             </div>
 
             {/* 2. Em Andamento */}
@@ -344,6 +363,16 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                 onChange={(e) => setProgressText(e.target.value)}
                 rows={2}
               />
+              <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => onPreviewWaMessage('Em Andamento', progressText)}
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <Eye size={14} /> 👁️ Ver Prévia do WhatsApp
+                </button>
+              </div>
             </div>
 
             {/* 3. Concluído */}
@@ -361,6 +390,16 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                 onChange={(e) => setCompletedText(e.target.value)}
                 rows={3}
               />
+              <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => onPreviewModal(completedText)}
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <Eye size={14} /> 👁️ Testar & Ver Prévia do Modal de Conclusão
+                </button>
+              </div>
             </div>
 
             {/* 4. Cancelado */}
@@ -378,20 +417,21 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
                 onChange={(e) => setCancelledText(e.target.value)}
                 rows={2}
               />
+              <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => onPreviewWaMessage('Cancelado', cancelledText)}
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <Eye size={14} /> 👁️ Ver Prévia do WhatsApp
+                </button>
+              </div>
             </div>
           </div>
 
           {/* ACTION BUTTONS FOR THIS SERVICE */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => onPreviewModal(completedText)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px' }}
-            >
-              <Eye size={16} /> 👁️ Testar & Ver Prévia do Modal
-            </button>
-
             <button
               type="button"
               className="btn primary"
@@ -404,6 +444,61 @@ function ServiceAccordionCard({ service, rules, isExpanded, onToggleExpand, apiB
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function WhatsAppPreviewModal({ title, templateText, serviceTitle, onClose }) {
+  const formatText = (text) => {
+    if (!text) return '';
+    return text
+      .split('{contact_name}').join('João Silva (Cliente Exemplo)')
+      .split('{service_title}').join(serviceTitle || 'Serviço Exemplo')
+      .split('{status}').join(title || 'Em Andamento')
+      .split('{document_number}').join('PROT-98124')
+      .split('{appointment_date}').join('25/08/2026 às 14:30')
+      .split('{total_value}').join('R$ 150,00')
+      .split('{notes}').join('Atendimento prioritário');
+  };
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 1000 }}>
+      <div className="modal-content glass-card" style={{ maxWidth: '500px', width: '90%', padding: '24px', borderRadius: '16px', position: 'relative' }}>
+        <button className="btn-icon modal-close-btn" onClick={onClose}>
+          <X size={20} />
+        </button>
+
+        <h3 style={{ fontSize: '1rem', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <MessageSquare size={20} style={{ color: '#25D366' }} /> Prévia do WhatsApp - {title}
+        </h3>
+
+        <div
+          className="whatsapp-bubble"
+          style={{
+            background: '#0b141a',
+            border: '1px solid rgba(37, 211, 102, 0.4)',
+            borderRadius: '12px',
+            padding: '16px',
+            color: '#e9edef',
+            fontSize: '0.88rem',
+            whiteSpace: 'pre-wrap',
+            lineHeight: '1.5',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            minHeight: '140px'
+          }}
+        >
+          {formatText(templateText)}
+          <div style={{ textAlign: 'right', fontSize: '0.7rem', color: '#8696a0', marginTop: '12px' }}>
+            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓✓
+          </div>
+        </div>
+
+        <div style={{ marginTop: '20px', textAlign: 'right' }}>
+          <button type="button" className="btn primary" onClick={onClose} style={{ padding: '8px 20px' }}>
+            Fechar Prévia
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

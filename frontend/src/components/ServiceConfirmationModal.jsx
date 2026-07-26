@@ -389,117 +389,129 @@ export function ServiceConfirmationModal({ card, tenantId, apiBaseUrl, onClose, 
                 </div>
               )}
 
-              {/* 2. SECTION: UNIVERSAL METADATA FIELDS */}
+              {/* 2. SECTION: DYNAMIC METADATA FIELDS (ONLY SHOW SELECTED FIELDS) */}
               <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px', borderRadius: '10px' }}>
                 <h4 style={{ fontSize: '0.84rem', fontWeight: '700', marginBottom: '10px', color: 'var(--secondary-accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <FileText size={16} /> Dados de Finalização do Atendimento:
                 </h4>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📑 Nº do Protocolo / Recibo</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: PROT-98124"
-                      value={metadata.protocol_number || metadata.document_number || ''}
-                      onChange={(e) => setMetadata({ ...metadata, protocol_number: e.target.value, document_number: e.target.value })}
-                    />
-                  </div>
+                  {(!targetService?.ocr_fields || targetService.ocr_fields.includes('protocol_number') || metadata.protocol_number || metadata.document_number) && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>📑 Nº do Protocolo / Recibo</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: PROT-98124"
+                        value={metadata.protocol_number || metadata.document_number || ''}
+                        onChange={(e) => setMetadata({ ...metadata, protocol_number: e.target.value, document_number: e.target.value })}
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📍 Local / Posto</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: Posto Central / Sala 02"
-                      value={metadata.appointment_location || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_location: e.target.value })}
-                    />
-                  </div>
+                  {(!targetService?.ocr_fields || targetService.ocr_fields.includes('full_name') || metadata.full_name) && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>👤 Nome do Cliente</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: João Silva"
+                        value={metadata.full_name || ''}
+                        onChange={(e) => setMetadata({ ...metadata, full_name: e.target.value })}
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 25/08/2026"
-                      value={metadata.appointment_date || metadata.document_date || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_date: e.target.value, document_date: e.target.value })}
-                    />
-                  </div>
+                  {(!targetService?.ocr_fields || targetService.ocr_fields.includes('cpf') || metadata.cpf) && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>🪪 CPF / CNPJ</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="000.000.000-00"
+                        value={metadata.cpf || ''}
+                        onChange={(e) => setMetadata({ ...metadata, cpf: e.target.value })}
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>⏰ Horário</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 14:30"
-                      value={metadata.appointment_time || ''}
-                      onChange={(e) => setMetadata({ ...metadata, appointment_time: e.target.value })}
-                    />
-                  </div>
+                  {(!targetService?.ocr_fields || targetService.ocr_fields.includes('document_date') || metadata.document_date || metadata.appointment_date) && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>📅 Data</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: 25/08/2026"
+                        value={metadata.document_date || metadata.appointment_date || ''}
+                        onChange={(e) => setMetadata({ ...metadata, document_date: e.target.value, appointment_date: e.target.value })}
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>💰 Valor Total (R$)</label>
-                    <input
-                      type="text"
-                      className="input-control select-sm"
-                      placeholder="Ex: 150,00"
-                      value={metadata.total_value || ''}
-                      onChange={(e) => setMetadata({ ...metadata, total_value: e.target.value })}
-                    />
-                  </div>
+                  {(!targetService?.ocr_fields || targetService.ocr_fields.includes('total_value') || metadata.total_value) && (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>💰 Valor Total (R$)</label>
+                      <input
+                        type="text"
+                        className="input-control select-sm"
+                        placeholder="Ex: 150,00"
+                        value={metadata.total_value || ''}
+                        onChange={(e) => setMetadata({ ...metadata, total_value: e.target.value })}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* 3. SECTION: DOCUMENT UPLOAD DROPZONE (FOR DOCUMENT DELIVERY, APPOINTMENT OR PIX COMPROVANTE) */}
-              <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px' }}>
-                <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <Upload size={14} className="accent-icon" /> Anexo ou Comprovante {completionType === 'document_delivery' ? '(Recomendado PDF/Foto)' : '(Opcional)'}:
-                </label>
-                
-                <div
-                  className={`dropzone ${isDragOver ? 'drag-over' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDragOver(false);
-                    if (e.dataTransfer.files?.[0]) {
-                      setFile(e.dataTransfer.files[0]);
-                      autoAnalyzeFile(e.dataTransfer.files[0]);
-                    }
-                  }}
-                  onClick={() => document.getElementById('unified-file-input').click()}
-                  style={{
-                    border: '1.5px dashed var(--border-glass)',
-                    borderRadius: '10px',
-                    padding: '14px 12px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    background: isDragOver ? 'rgba(99, 102, 241, 0.15)' : 'rgba(15, 23, 42, 0.2)'
-                  }}
-                >
-                  <input id="unified-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={handleFileChange} />
-                  <Upload size={20} style={{ color: 'var(--primary-accent)', margin: '0 auto 4px' }} />
-                  <p style={{ fontWeight: '600', fontSize: '0.8rem', margin: 0 }}>
-                    {analyzing ? 'Analisando documento com OCR...' : file ? file.name : 'Arraste um PDF/Foto ou clique para anexa comprovante'}
-                  </p>
+              {/* 3. SECTION: DOCUMENT UPLOAD DROPZONE (ONLY IF OCR IS ENABLED OR ATTACHMENT EXISTS) */}
+              {(targetService?.ocr_enabled !== false || file || attachmentUrl) && (
+                <div className="glass-subcard" style={{ padding: '14px', marginBottom: '16px' }}>
+                  <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <Upload size={14} className="accent-icon" /> Anexo / Comprovante com Leitura OCR:
+                  </label>
+                  
+                  <div
+                    className={`dropzone ${isDragOver ? 'drag-over' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(false);
+                      if (e.dataTransfer.files?.[0]) {
+                        setFile(e.dataTransfer.files[0]);
+                        autoAnalyzeFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    onClick={() => document.getElementById('unified-file-input').click()}
+                    style={{
+                      border: '1.5px dashed var(--border-glass)',
+                      borderRadius: '10px',
+                      padding: '14px 12px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: isDragOver ? 'rgba(99, 102, 241, 0.15)' : 'rgba(15, 23, 42, 0.2)'
+                    }}
+                  >
+                    <input id="unified-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={handleFileChange} />
+                    <Upload size={20} style={{ color: 'var(--primary-accent)', margin: '0 auto 4px' }} />
+                    <p style={{ fontWeight: '600', fontSize: '0.8rem', margin: 0 }}>
+                      {analyzing ? 'Analisando documento com OCR...' : file ? file.name : 'Arraste um PDF/Foto para leitura automática do OCR'}
+                    </p>
+                  </div>
+
+                  {attachmentUrl && (
+                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--primary-accent)' }}>
+                      <FileText size={12} /> <a href={attachmentUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Ver comprovante salvo</a>
+                    </div>
+                  )}
+
+                  {ocrSuccess && (
+                    <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontSize: '0.78rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ✨ Leitura OCR concluída com sucesso! Os campos selecionados foram preenchidos.
+                    </div>
+                  )}
                 </div>
-
-                {attachmentUrl && (
-                  <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--primary-accent)' }}>
-                    <FileText size={12} /> <a href={attachmentUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Ver comprovante salvo</a>
-                  </div>
-                )}
-
-                {ocrSuccess && (
-                  <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontSize: '0.78rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ✨ Leitura OCR concluída com sucesso! Os campos abaixo foram preenchidos automaticamente.
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Notes / Summary */}
               <div className="form-group">
