@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, Send, CalendarPlus, User, Phone, CheckCircle, RefreshCw, Search,
   Paperclip, CheckCheck, Sparkles, Filter, Bot, ChevronRight, X, Image, FileText,
-  Clock, AlertCircle, Zap, Tag, ChevronLeft, Check, Edit3, ArrowRight, CornerDownLeft
+  Clock, AlertCircle, Zap, Tag, ChevronLeft, Check, Edit3, ArrowRight, CornerDownLeft, Bell
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
 
