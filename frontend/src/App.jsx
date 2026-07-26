@@ -26,8 +26,7 @@ function AppContent() {
   const userRole = profile?.role || 'tenant_operator';
   const isSuperAdmin = userRole === 'super_admin';
 
-  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'super_admin' : 'workspace');
-  const [workspaceMode, setWorkspaceMode] = useState('split'); // 'split', 'kanban_full', 'chat_full'
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'super_admin' : 'kanban');
   const [tenantId, setTenantId] = useState(profile?.tenant_id || '00000000-0000-0000-0000-000000000001');
 
   const [showQrModal, setShowQrModal] = useState(false);
@@ -252,15 +251,21 @@ function AppContent() {
               </button>
             </>
           ) : (
-            /* Tenant Admin & Operators see Integrated Operational Tabs */
+            /* Tenant Admin & Operators see Operational Tabs */
             <>
               <button
                 id="tour-kanban-board"
-                className={`tab-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-                onClick={() => setActiveTab('workspace')}
-                style={{ fontWeight: '800' }}
+                className={`tab-btn ${activeTab === 'kanban' ? 'active' : ''}`}
+                onClick={() => setActiveTab('kanban')}
               >
-                <Split size={18} /> Central One-Screen (Lado a Lado)
+                <LayoutGrid size={18} /> 1. Quadro de Pedidos
+              </button>
+
+              <button
+                className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveTab('chat')}
+              >
+                <MessageSquare size={18} /> 2. Conversas no WhatsApp
               </button>
 
               {userRole === 'tenant_admin' && (
@@ -268,7 +273,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`}
                   onClick={() => setActiveTab('services')}
                 >
-                  <Layers size={18} /> Serviços
+                  <Layers size={18} /> 3. Serviços
                 </button>
               )}
 
@@ -277,7 +282,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
                   onClick={() => setActiveTab('notifications')}
                 >
-                  <Bell size={18} /> Lembretes e Avisos
+                  <Bell size={18} /> 4. Lembretes e Avisos
                 </button>
               )}
 
@@ -286,7 +291,7 @@ function AppContent() {
                   className={`tab-btn ${activeTab === 'team' ? 'active' : ''}`}
                   onClick={() => setActiveTab('team')}
                 >
-                  <Users size={18} /> Nossa Equipe
+                  <Users size={18} /> 5. Nossa Equipe
                 </button>
               )}
 
@@ -316,58 +321,12 @@ function AppContent() {
             </>
           ) : (
             <>
-              {/* UNIFIED ONE-SCREEN WORKSPACE (SPLIT-SCREEN VIEW) */}
-              {activeTab === 'workspace' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Mode Selector Sub-header */}
-                  <div className="glass-card" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Split size={20} className="accent-icon" />
-                      <h3 style={{ fontSize: '0.98rem', margin: 0, fontWeight: '800' }}>Central Integrada One-Screen</h3>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>— Kanban e Chat do WhatsApp operando juntos na mesma tela</span>
-                    </div>
+              {activeTab === 'kanban' && (
+                <KanbanBoard tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
+              )}
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        className={`btn ${workspaceMode === 'split' ? 'primary' : 'secondary'}`}
-                        onClick={() => setWorkspaceMode('split')}
-                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Split size={14} /> 📊 Lado a Lado (50/50)
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`btn ${workspaceMode === 'kanban_full' ? 'primary' : 'secondary'}`}
-                        onClick={() => setWorkspaceMode('kanban_full')}
-                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <LayoutGrid size={14} /> 📌 Apenas Kanban
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`btn ${workspaceMode === 'chat_full' ? 'primary' : 'secondary'}`}
-                        onClick={() => setWorkspaceMode('chat_full')}
-                        style={{ fontSize: '0.78rem', padding: '6px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <MessageSquare size={14} /> 💬 Apenas Conversas
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* The Split Container */}
-                  <div className={`one-screen-workspace mode-${workspaceMode}`}>
-                    <div className="one-screen-kanban-col">
-                      <KanbanBoard tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
-                    </div>
-
-                    <div className="one-screen-chat-col">
-                      <LiveChatCentral tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
-                    </div>
-                  </div>
-                </div>
+              {activeTab === 'chat' && (
+                <LiveChatCentral tenantId={tenantId} apiBaseUrl={API_BASE_URL} />
               )}
 
               {activeTab === 'services' && (
