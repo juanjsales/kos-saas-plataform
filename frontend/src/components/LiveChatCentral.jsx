@@ -51,7 +51,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
   const [collectedData, setCollectedData] = useState({});
   const [isSending, setIsSending] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [showCustomerDrawer, setShowCustomerDrawer] = useState(true);
+  const [showCustomerDrawer, setShowCustomerDrawer] = useState(false);
   const [customerCards, setCustomerCards] = useState([]);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -336,7 +336,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
       <div className="wa-web-app glass-card" style={{ display: 'flex', width: '100%', flex: 1, borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-lg)' }}>
         
         {/* LEFT PANEL: CONTACTS LIST (WHATSAPP WEB SIDEBAR) */}
-        <div className="wa-sidebar" style={{ width: '340px', minWidth: '300px', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-light)', background: '#ffffff' }}>
+        <div className="wa-sidebar" style={{ width: '320px', minWidth: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-light)', background: '#ffffff' }}>
           {/* Header Bar */}
           <div className="wa-sidebar-header" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', background: '#f8fafc' }}>
             <div className="wa-my-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -456,7 +456,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
         </div>
 
         {/* MIDDLE PANEL: MAIN WHATSAPP CHAT THREAD */}
-        <div className="wa-chat-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+        <div className="wa-chat-panel" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
           {selectedChat ? (
             <>
               {/* WhatsApp Web Chat Header */}
@@ -649,7 +649,7 @@ export function LiveChatCentral({ tenantId, apiBaseUrl }) {
 
         {/* RIGHT PANEL: CUSTOMER INFO & KANBAN CARDS DRAWER */}
         {selectedChat && showCustomerDrawer && (
-          <div className="customer-info-drawer" style={{ width: '320px', minWidth: '300px', borderLeft: '1px solid #e2e8f0', background: '#ffffff', padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          <div className="customer-info-drawer" style={{ width: '300px', minWidth: '280px', flexShrink: 0, borderLeft: '1px solid #e2e8f0', background: '#ffffff', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Contact Header */}
             <div style={{ textAlign: 'center', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5 0%, #10b981 100%)', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 12px', boxShadow: '0 6px 16px rgba(79, 70, 229, 0.25)' }}>
