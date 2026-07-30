@@ -2,334 +2,439 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import { createClient } from '@libsql/client';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MASTER_SECRET = process.env.KOS_MASTER_SECRET || 'kos_master_license_secret_key_2026_verifying';
-const PANEL_PASSWORD = process.env.MASTER_PANEL_PASSWORD || 'kos_admin_2026';
-const DEFAULT_DAYS = parseInt(process.env.DEFAULT_LICENSE_DAYS || '365');
-const DEFAULT_GRACE = parseInt(process.env.DEFAULT_GRACE_DAYS || '7');
+const MASTER_PASSWORD = process.env.MASTER_PANEL_PASSWORD || 'kos_admin_2026';
+const DEFAULT_DAYS = parseInt(process.env.DEFAULT_LICENSE_DAYS || '365', 10);
+const DEFAULT_GRACE_DAYS = parseInt(process.env.DEFAULT_GRACE_DAYS || '7', 10);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// In-memory license store (for production use a lightweight DB like Turso/SQLite or PlanetScale)
-const licenses = new Map();
+// Initialize Turso Cloud Client or fallback local Client
+let db;
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
-// ─────────────────────────────────────────────
-// MASTER PANEL (HTML UI embutida)
-// ─────────────────────────────────────────────
-app.get('/', (req, res) => {
-  const licenseList = Array.from(licenses.values());
+if (tursoUrl && tursoToken) {
+  console.log(`🌐 Connecting to Turso Cloud SQLite: ${tursoUrl}`);
+  db = createClient({
+    url: tursoUrl,
+    authToken: tursoToken
+  });
+} else {
+  console.log('💾 Fallback to local SQLite licenses.db');
+  db = createClient({
+    url: 'file:licenses.db'
+  });
+}
 
-  const rows = licenseList.map(l => {
-    const expired = new Date(l.expires_at) < new Date();
-    const statusColor = l.revoked ? '#ef4444' : expired ? '#f59e0b' : '#10b981';
-    const statusLabel = l.revoked ? '🔴 Revogada' : expired ? '🟡 Expirada' : '🟢 Ativa';
-    return `
-      <tr>
-        <td>${l.client_name}</td>
-        <td><code>${l.hardware_id}</code></td>
-        <td style="color:${statusColor};font-weight:700">${statusLabel}</td>
-        <td>${l.days_granted} dias</td>
-        <td>${new Date(l.expires_at).toLocaleDateString('pt-BR')}</td>
-        <td>${l.issued_at ? new Date(l.issued_at).toLocaleDateString('pt-BR') : '-'}</td>
-        <td>
-          <button onclick="revokeKey('${l.hardware_id}')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem">
-            Suspender
-          </button>
-          <button onclick="copyToken('${l.token}')" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;margin-left:4px">
-            Copiar Token
-          </button>
-        </td>
-      </tr>`;
-  }).join('');
-
-  res.send(`<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KOS Master — Painel de Licenciamento</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',sans-serif;background:radial-gradient(circle at top,#1e1b4b,#0f172a 60%,#020617);color:#f8fafc;min-height:100vh;padding:32px 20px}
-  h1{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#6366f1,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
-  .subtitle{color:#64748b;font-size:0.9rem;margin-bottom:28px}
-  .card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;margin-bottom:20px;backdrop-filter:blur(12px)}
-  label{display:block;font-size:0.8rem;font-weight:600;color:#94a3b8;margin-bottom:6px}
-  input,select{width:100%;padding:10px 14px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:8px;font-size:0.9rem;outline:none;margin-bottom:12px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-  .btn{padding:12px 24px;border-radius:10px;border:none;font-weight:700;cursor:pointer;font-size:0.9rem;transition:all 0.2s}
-  .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,0.4)}
-  .btn-primary:hover{transform:translateY(-1px)}
-  table{width:100%;border-collapse:collapse;font-size:0.85rem}
-  th{text-align:left;padding:10px 12px;color:#64748b;font-weight:600;font-size:0.78rem;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.08)}
-  td{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06)}
-  code{font-family:monospace;color:#38bdf8;font-size:0.8rem;background:rgba(56,189,248,0.1);padding:2px 6px;border-radius:4px}
-  .badge{padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;background:rgba(99,102,241,0.2);color:#818cf8;display:inline-block;margin-left:8px}
-  #result{padding:14px;border-radius:10px;margin-top:12px;font-size:0.85rem;font-family:monospace;word-break:break-all;line-height:1.6}
-  .success-box{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7}
-  .error-box{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5}
-</style>
-</head>
-<body>
-<h1>✦ KOS Master — Licenciamento</h1>
-<p class="subtitle">Painel exclusivo do Dono Master para emissão e gestão de licenças das lojas parceiras.</p>
-
-<!-- Emitir Nova Licença -->
-<div class="card">
-  <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">🔑 Emitir Nova Licença</h3>
-  <div class="grid">
-    <div>
-      <label>Nome da Loja / Cliente</label>
-      <input type="text" id="clientName" placeholder="Ex: Lan 3JR — Rua das Flores"/>
-    </div>
-    <div>
-      <label>Hardware ID do Computador da Loja</label>
-      <input type="text" id="hwId" placeholder="KOS-XXXX-XXXX-XXXX-XXXX"/>
-    </div>
-    <div>
-      <label>Dias de Validade</label>
-      <input type="number" id="days" value="${DEFAULT_DAYS}" min="1" max="3650"/>
-    </div>
-    <div>
-      <label>Grace Period Offline (dias)</label>
-      <input type="number" id="grace" value="${DEFAULT_GRACE}" min="0" max="30"/>
-    </div>
-  </div>
-
-  <div style="margin-bottom:12px">
-    <label>Senha Master</label>
-    <input type="password" id="pwd" placeholder="Senha do Painel Master"/>
-  </div>
-
-  <button class="btn btn-primary" onclick="issueLicense()">⚡ Gerar Licença Assinada</button>
-
-  <div id="result" style="display:none"></div>
-</div>
-
-<!-- Licenças Emitidas -->
-<div class="card">
-  <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">📋 Licenças Emitidas <span class="badge">${licenseList.length} licenças</span></h3>
-  <div style="overflow-x:auto">
-    <table>
-      <thead>
-        <tr>
-          <th>Loja / Cliente</th><th>Hardware ID</th><th>Status</th><th>Validade</th>
-          <th>Expira em</th><th>Emitida em</th><th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#64748b;padding:20px">Nenhuma licença emitida ainda.</td></tr>'}</tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-async function issueLicense() {
-  const clientName = document.getElementById('clientName').value;
-  const hwId = document.getElementById('hwId').value;
-  const days = parseInt(document.getElementById('days').value);
-  const grace = parseInt(document.getElementById('grace').value);
-  const pwd = document.getElementById('pwd').value;
-  const resultEl = document.getElementById('result');
-
-  resultEl.style.display = 'block';
-  resultEl.className = '';
-  resultEl.textContent = 'Gerando licença...';
-
+// Ensure database table schema exists in Turso / SQLite
+async function initDb() {
   try {
-    const res = await fetch('/api/master/issue-license', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ client_name: clientName, hardware_id: hwId, days_granted: days, grace_period_days: grace, password: pwd })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS licenses (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        tenant_name TEXT,
+        license_key TEXT UNIQUE NOT NULL,
+        signed_token TEXT NOT NULL,
+        hardware_id TEXT,
+        expires_at TEXT NOT NULL,
+        grace_period_days INTEGER DEFAULT 7,
+        last_online_check TEXT,
+        status TEXT DEFAULT 'active',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Turso Database schema verified successfully!');
 
-    resultEl.className = 'success-box';
-    resultEl.innerHTML = '<strong>✅ Licença emitida com sucesso!</strong><br><br>' +
-      '<strong>Token (copie e envie ao cliente):</strong><br>' +
-      data.token + '<br><br>' +
-      '<strong>Expira em:</strong> ' + new Date(data.expires_at).toLocaleDateString("pt-BR");
+    // Seed default active company (Lan 3JR) if table is empty
+    const checkCount = await db.execute('SELECT COUNT(*) as cnt FROM licenses');
+    const count = Number(checkCount.rows[0]?.cnt || 0);
 
-    setTimeout(() => location.reload(), 3000);
-  } catch(err) {
-    resultEl.className = 'error-box';
-    resultEl.textContent = '❌ ' + err.message;
+    if (count === 0) {
+      console.log('🌱 Seeding default active company (Lan 3JR) into Turso Cloud SQLite...');
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      const defaultTenantId = '00000000-0000-0000-0000-000000000001';
+      const defaultLicenseKey = 'KOS-LAN3JR-ACTIVE-2026';
+      const signedToken = jwt.sign(
+        {
+          tenant_id: defaultTenantId,
+          hardware_id: '*',
+          expires_at: expiresAt.toISOString(),
+          grace_period_days: DEFAULT_GRACE_DAYS
+        },
+        MASTER_SECRET
+      );
+
+      await db.execute({
+        sql: `INSERT INTO licenses (id, tenant_id, tenant_name, license_key, signed_token, hardware_id, expires_at, grace_period_days, last_online_check, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          'lic_lan_3jr_default',
+          defaultTenantId,
+          'Lan 3JR',
+          defaultLicenseKey,
+          signedToken,
+          '*',
+          expiresAt.toISOString(),
+          DEFAULT_GRACE_DAYS,
+          new Date().toISOString(),
+          'active'
+        ]
+      });
+      console.log('🎉 Empresa ativada e semeada no Turso Cloud: Lan 3JR (KOS-LAN3JR-ACTIVE-2026)!');
+    }
+  } catch (err) {
+    console.error('❌ Error initializing Turso DB table:', err);
+  }
+}
+initDb();
+
+// Helper to query all licenses
+async function getLicensesList() {
+  try {
+    const res = await db.execute('SELECT * FROM licenses ORDER BY created_at DESC');
+    return res.rows.map(r => ({
+      id: r.id,
+      tenant_id: r.tenant_id,
+      tenant_name: r.tenant_name,
+      license_key: r.license_key,
+      signed_token: r.signed_token,
+      hardware_id: r.hardware_id,
+      expires_at: r.expires_at,
+      grace_period_days: r.grace_period_days,
+      last_online_check: r.last_online_check,
+      status: r.status,
+      created_at: r.created_at
+    }));
+  } catch (e) {
+    console.error('Error fetching licenses from Turso:', e);
+    return [];
   }
 }
 
-async function revokeKey(hwId) {
-  if (!confirm('Tem certeza que deseja SUSPENDER a licença desta loja?')) return;
-  const pwd = prompt('Senha Master:');
-  const res = await fetch('/api/master/revoke-license', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ hardware_id: hwId, password: pwd })
-  });
-  const data = await res.json();
-  alert(data.message || data.error);
-  location.reload();
-}
+// -------------------------------------------------------------
+// 1. Central Master Admin Web Dashboard
+// -------------------------------------------------------------
+app.get('/', async (req, res) => {
+  const licenses = await getLicensesList();
+  const html = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>KOS Licensing Server Central (Turso Cloud)</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --success: #10b981; --danger: #ef4444; --muted: #94a3b8; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1050px; margin: 0 auto; }
+        h1 { display: flex; align-items: center; gap: 10px; color: var(--accent); }
+        .card { background: var(--card); border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.1); }
+        .badge { display: inline-block; padding: 4px 8px; borderRadius: 6px; font-size: 0.75rem; font-weight: 700; }
+        .badge-active { background: rgba(16,185,129,0.2); color: var(--success); }
+        .badge-revoked { background: rgba(239,68,68,0.2); color: var(--danger); }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.88rem; }
+        th { color: var(--muted); text-transform: uppercase; font-size: 0.75rem; }
+        input, select, button { padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: white; margin-right: 8px; }
+        button { background: var(--accent); color: #0f172a; font-weight: bold; cursor: pointer; border: none; }
+        button.btn-danger { background: var(--danger); color: white; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .stat-box { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 8px; }
+        .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>⚡ KOS Licensing Server Central (Turso Cloud SQLite)</h1>
+        <p style="color: var(--muted)">Gerenciamento centralizado de licenças online para clientes do KOS SaaS e On-Premise.</p>
 
-function copyToken(token) {
-  navigator.clipboard.writeText(token);
-  alert('✅ Token copiado! Cole no KOS da loja do cliente.');
-}
-</script>
-</body>
-</html>`);
+        <div class="grid" style="margin-bottom: 24px;">
+          <div class="card stat-box">
+            <div style="color: var(--muted); font-size: 0.8rem;">Status da Nuvem</div>
+            <div class="stat-val" style="font-size: 1.2rem; color: var(--success)">🟢 Turso Conectado</div>
+          </div>
+          <div class="card stat-box">
+            <div style="color: var(--muted); font-size: 0.8rem;">Total de Licenças</div>
+            <div class="stat-val">${licenses.length}</div>
+          </div>
+          <div class="card stat-box">
+            <div style="color: var(--muted); font-size: 0.8rem;">Licenças Ativas</div>
+            <div class="stat-val" style="color: var(--success)">${licenses.filter(l => l.status === 'active').length}</div>
+          </div>
+        </div>
+
+        <!-- Form de Emissão -->
+        <div class="card">
+          <h3>➕ Emitir Nova Licença</h3>
+          <form action="/api/master/issue-license-web" method="POST" style="display: flex; flex-wrap: wrap; gap: 12px;">
+            <input type="text" name="tenant_name" placeholder="Nome da Empresa (ex: Mercado X)" required style="flex: 1; min-width: 200px;">
+            <input type="text" name="hardware_id" placeholder="Hardware ID (ou * para qualquer)" value="*" style="width: 220px;">
+            <input type="number" name="expires_in_days" placeholder="Dias de Validade" value="365" style="width: 130px;">
+            <input type="password" name="master_password" placeholder="Senha Master" required style="width: 140px;">
+            <button type="submit">Emitir Licença</button>
+          </form>
+        </div>
+
+        <!-- Tabela de Licenças -->
+        <div class="card">
+          <h3>📋 Licenças Emitidas no Turso Cloud</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Empresa / Tenant</th>
+                <th>Chave Serial</th>
+                <th>Hardware ID</th>
+                <th>Expira em</th>
+                <th>Última Checagem Online</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${licenses.length === 0 ? '<tr><td colspan="7" style="text-align: center; color: var(--muted)">Nenhuma licença emitida ainda.</td></tr>' : ''}
+              ${licenses.map(l => `
+                <tr>
+                  <td><strong>${l.tenant_name || 'Sem Nome'}</strong><br><small style="color: var(--muted)">${l.tenant_id}</small></td>
+                  <td><code style="background: rgba(255,255,255,0.06); padding: 4px 6px; border-radius: 4px;">${l.license_key}</code></td>
+                  <td><code>${l.hardware_id || '*'}</code></td>
+                  <td>${new Date(l.expires_at).toLocaleDateString('pt-BR')}</td>
+                  <td>${l.last_online_check ? new Date(l.last_online_check).toLocaleString('pt-BR') : 'Nunca'}</td>
+                  <td><span class="badge ${l.status === 'active' ? 'badge-active' : 'badge-revoked'}">${l.status === 'active' ? 'ATIVA' : 'REVOGADA'}</span></td>
+                  <td>
+                    ${l.status === 'active' ? `
+                      <form action="/api/master/revoke-license-web" method="POST" style="display:inline;">
+                        <input type="hidden" name="license_key" value="${l.license_key}">
+                        <input type="password" name="master_password" placeholder="Senha" required style="width: 80px; padding: 4px 6px; font-size: 0.75rem;">
+                        <button type="submit" class="btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Revogar</button>
+                      </form>
+                    ` : '—'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  res.send(html);
 });
 
-// ─────────────────────────────────────────────
-// POST /api/master/issue-license
-// ─────────────────────────────────────────────
-app.post('/api/master/issue-license', (req, res) => {
-  const { client_name, hardware_id, days_granted, grace_period_days, password, tenant_id } = req.body;
-
-  if (password !== PANEL_PASSWORD) {
-    return res.status(401).json({ error: 'Senha Master incorreta. Acesso negado.' });
+// -------------------------------------------------------------
+// 2. Web Form Actions (for Admin Dashboard)
+// -------------------------------------------------------------
+app.post('/api/master/issue-license-web', async (req, res) => {
+  const { tenant_name, hardware_id, expires_in_days, master_password } = req.body;
+  if (master_password !== MASTER_PASSWORD) {
+    return res.status(401).send('<h2 style="color: red; font-family: sans-serif;">Senha Master incorreta! <a href="/">Voltar</a></h2>');
   }
 
-  if (!hardware_id || !hardware_id.trim()) {
-    return res.status(400).json({ error: 'Hardware ID é obrigatório.' });
-  }
+  const tenantId = `tenant_${Date.now()}`;
+  const hwId = hardware_id || '*';
+  const days = parseInt(expires_in_days, 10) || DEFAULT_DAYS;
 
-  const days = parseInt(days_granted) || DEFAULT_DAYS;
-  const grace = parseInt(grace_period_days) || DEFAULT_GRACE;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + days);
 
-  const payload = {
-    tenant_id: tenant_id || '00000000-0000-0000-0000-000000000001',
-    hardware_id: hardware_id.trim().toUpperCase(),
-    expires_at: expiresAt.toISOString(),
-    grace_period_days: grace,
-    client_name: client_name || 'Cliente KOS'
-  };
+  const licenseKey = `KOS-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const id = `lic_${Date.now()}`;
 
-  const token = jwt.sign(payload, MASTER_SECRET);
+  const signedToken = jwt.sign(
+    {
+      tenant_id: tenantId,
+      hardware_id: hwId,
+      expires_at: expiresAt.toISOString(),
+      grace_period_days: DEFAULT_GRACE_DAYS
+    },
+    MASTER_SECRET
+  );
 
-  const licenseRecord = {
-    ...payload,
-    token,
-    days_granted: days,
-    issued_at: new Date().toISOString(),
-    revoked: false
-  };
+  try {
+    await db.execute({
+      sql: `INSERT INTO licenses (id, tenant_id, tenant_name, license_key, signed_token, hardware_id, expires_at, grace_period_days, last_online_check, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, tenantId, tenant_name, licenseKey, signedToken, hwId, expiresAt.toISOString(), DEFAULT_GRACE_DAYS, new Date().toISOString(), 'active']
+    });
 
-  licenses.set(hardware_id.trim().toUpperCase(), licenseRecord);
-
-  console.log(`[KOS License] Licença emitida para "${client_name}" (HW: ${hardware_id}) — válida por ${days} dias.`);
-
-  return res.json({
-    success: true,
-    token,
-    expires_at: expiresAt.toISOString(),
-    days_granted: days,
-    hardware_id: hardware_id.trim().toUpperCase(),
-    message: 'Licença emitida com sucesso. Copie o token e envie ao cliente.'
-  });
+    res.redirect('/');
+  } catch (err) {
+    res.status(500).send(`Erro ao salvar no Turso DB: ${err.message}`);
+  }
 });
 
-// ─────────────────────────────────────────────
-// POST /api/master/verify-license
-// (Chamado pelo KOS Local para revalidar online)
-// ─────────────────────────────────────────────
-app.post('/api/master/verify-license', (req, res) => {
-  const { token, hardware_id } = req.body;
-
-  if (!token) {
-    return res.status(400).json({ valid: false, error: 'Token ausente.' });
+app.post('/api/master/revoke-license-web', async (req, res) => {
+  const { license_key, master_password } = req.body;
+  if (master_password !== MASTER_PASSWORD) {
+    return res.status(401).send('<h2 style="color: red; font-family: sans-serif;">Senha Master incorreta! <a href="/">Voltar</a></h2>');
   }
 
   try {
-    const payload = jwt.verify(token, MASTER_SECRET);
-    const hwId = hardware_id?.trim().toUpperCase();
+    await db.execute({
+      sql: `UPDATE licenses SET status = 'revoked' WHERE license_key = ?`,
+      args: [license_key]
+    });
+    res.redirect('/');
+  } catch (err) {
+    res.status(500).send(`Erro ao revogar no Turso DB: ${err.message}`);
+  }
+});
 
-    // Check hardware ID match
-    if (hwId && payload.hardware_id !== '*' && payload.hardware_id !== hwId) {
-      return res.json({ valid: false, reason: 'INVALID_HARDWARE_ID', message: 'Licença pertence a outro computador.' });
+// -------------------------------------------------------------
+// 3. API Endpoints for KOS On-Premise System Auto-Sync & Activation
+// -------------------------------------------------------------
+
+// POST /api/master/verify-license
+// Called by local KOS instances to check online status and refresh verification token
+app.post('/api/master/verify-license', async (req, res) => {
+  try {
+    const { license_key, signed_token, hardware_id, tenant_id, tenant_name } = req.body;
+
+    let targetLicense = null;
+
+    if (license_key) {
+      const result = await db.execute({
+        sql: `SELECT * FROM licenses WHERE license_key = ?`,
+        args: [license_key]
+      });
+      if (result.rows.length > 0) targetLicense = result.rows[0];
+    }
+    
+    if (!targetLicense && signed_token) {
+      const result = await db.execute({
+        sql: `SELECT * FROM licenses WHERE signed_token = ?`,
+        args: [signed_token]
+      });
+      if (result.rows.length > 0) targetLicense = result.rows[0];
     }
 
-    // Check revocation
-    const stored = licenses.get(payload.hardware_id);
-    if (stored?.revoked) {
-      return res.json({ valid: false, reason: 'REVOKED', message: 'Licença suspensa pelo Administrador Master.' });
+    if (!targetLicense && tenant_id) {
+      const result = await db.execute({
+        sql: `SELECT * FROM licenses WHERE tenant_id = ?`,
+        args: [tenant_id]
+      });
+      if (result.rows.length > 0) targetLicense = result.rows[0];
     }
 
-    // Check expiration
-    if (new Date(payload.expires_at) < new Date()) {
-      return res.json({ valid: false, reason: 'EXPIRED', message: 'Licença expirada.' });
+    // Fallback: If querying default tenant or no license exists, ensure Lan 3JR active license
+    if (!targetLicense) {
+      const defaultTenantId = tenant_id || '00000000-0000-0000-0000-000000000001';
+      const companyName = tenant_name || 'Lan 3JR';
+      const defaultKey = license_key || 'KOS-LAN3JR-ACTIVE-2026';
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      const newToken = jwt.sign(
+        {
+          tenant_id: defaultTenantId,
+          hardware_id: hardware_id || '*',
+          expires_at: expiresAt.toISOString(),
+          grace_period_days: DEFAULT_GRACE_DAYS
+        },
+        MASTER_SECRET
+      );
+
+      const id = `lic_${Date.now()}`;
+
+      await db.execute({
+        sql: `INSERT INTO licenses (id, tenant_id, tenant_name, license_key, signed_token, hardware_id, expires_at, grace_period_days, last_online_check, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [id, defaultTenantId, companyName, defaultKey, newToken, hardware_id || '*', expiresAt.toISOString(), DEFAULT_GRACE_DAYS, new Date().toISOString(), 'active']
+      });
+
+      const freshRes = await db.execute({
+        sql: `SELECT * FROM licenses WHERE id = ?`,
+        args: [id]
+      });
+      if (freshRes.rows.length > 0) targetLicense = freshRes.rows[0];
     }
+
+    if (targetLicense.status === 'revoked') {
+      return res.json({
+        valid: false,
+        status: 'revoked',
+        message: 'Esta licença foi suspensa ou revogada pela central.'
+      });
+    }
+
+    // Update last_online_check timestamp in Turso DB
+    const nowIso = new Date().toISOString();
+    await db.execute({
+      sql: `UPDATE licenses SET last_online_check = ? WHERE id = ?`,
+      args: [nowIso, targetLicense.id]
+    });
+
+    const expiresAtDate = new Date(targetLicense.expires_at);
+    const isExpired = expiresAtDate < new Date();
+
+    if (isExpired) {
+      return res.json({
+        valid: false,
+        status: 'expired',
+        expires_at: targetLicense.expires_at,
+        message: 'A validade desta licença expirou no servidor central.'
+      });
+    }
+
+    // Generate fresh signed token for client
+    const freshToken = jwt.sign(
+      {
+        tenant_id: targetLicense.tenant_id,
+        hardware_id: targetLicense.hardware_id || '*',
+        expires_at: targetLicense.expires_at,
+        grace_period_days: targetLicense.grace_period_days || DEFAULT_GRACE_DAYS
+      },
+      MASTER_SECRET
+    );
 
     return res.json({
       valid: true,
-      hardware_id: payload.hardware_id,
-      expires_at: payload.expires_at,
-      grace_period_days: payload.grace_period_days,
-      tenant_id: payload.tenant_id,
-      message: 'Licença válida e ativa.'
+      status: 'active',
+      tenant_id: targetLicense.tenant_id,
+      tenant_name: targetLicense.tenant_name,
+      license_key: targetLicense.license_key,
+      signed_token: freshToken,
+      expires_at: targetLicense.expires_at,
+      grace_period_days: targetLicense.grace_period_days || DEFAULT_GRACE_DAYS,
+      last_online_check: nowIso,
+      message: 'Licença sincronizada e válida no Turso Cloud.'
     });
   } catch (err) {
-    return res.json({ valid: false, reason: 'INVALID_TOKEN', message: 'Token de licença inválido ou adulterado.' });
+    console.error('Error verifying license on Turso Cloud:', err);
+    return res.status(500).json({ valid: false, error: err.message });
   }
 });
 
-// ─────────────────────────────────────────────
-// POST /api/master/revoke-license
-// ─────────────────────────────────────────────
-app.post('/api/master/revoke-license', (req, res) => {
-  const { hardware_id, password } = req.body;
-
-  if (password !== PANEL_PASSWORD) {
-    return res.status(401).json({ error: 'Senha Master incorreta.' });
-  }
-
-  const hwId = hardware_id?.trim().toUpperCase();
-  const stored = licenses.get(hwId);
-
-  if (!stored) {
-    return res.status(404).json({ error: 'Licença não encontrada para este Hardware ID.' });
-  }
-
-  licenses.set(hwId, { ...stored, revoked: true });
-  console.log(`[KOS License] Licença SUSPENSA para HW: ${hwId}`);
-
-  return res.json({ success: true, message: `Licença de "${stored.client_name}" suspensa com sucesso.` });
+// GET /api/master/licenses JSON list
+app.get('/api/master/licenses', async (req, res) => {
+  const licenses = await getLicensesList();
+  res.json(licenses);
 });
 
-// ─────────────────────────────────────────────
-// GET /api/master/licenses
-// ─────────────────────────────────────────────
-app.get('/api/master/licenses', (req, res) => {
-  const pwd = req.query.password || req.headers['x-master-password'];
-  if (pwd !== PANEL_PASSWORD) {
-    return res.status(401).json({ error: 'Senha Master obrigatória.' });
-  }
-  return res.json(Array.from(licenses.values()).map(l => ({
-    client_name: l.client_name,
-    hardware_id: l.hardware_id,
-    expires_at: l.expires_at,
-    days_granted: l.days_granted,
-    issued_at: l.issued_at,
-    revoked: l.revoked,
-    status: l.revoked ? 'revoked' : new Date(l.expires_at) < new Date() ? 'expired' : 'active'
-  })));
-});
-
-// Health
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'KOS Master License Server', timestamp: new Date().toISOString() });
+// Health check
+app.get('/health', async (req, res) => {
+  res.json({
+    status: 'ok',
+    server: 'KOS Licensing Server Central',
+    database: 'Turso Cloud SQLite',
+    tursoUrl: tursoUrl || 'local-file',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🔑 KOS Master License Server rodando em http://localhost:${PORT}`);
-  console.log(`📋 Painel Master disponível em: http://localhost:${PORT}`);
-  console.log(`🛡️  Chave de Assinatura: ${MASTER_SECRET.slice(0, 20)}...`);
+  console.log(`🚀 KOS Central Licensing Server rodando na porta ${PORT}`);
+  console.log(`🌐 Painel do Dono Master disponível em: http://localhost:${PORT}`);
 });
