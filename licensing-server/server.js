@@ -207,7 +207,15 @@ app.get('/', async (req, res) => {
               ${licenses.map(l => `
                 <tr>
                   <td><strong>${l.tenant_name || 'Sem Nome'}</strong><br><small style="color: var(--muted)">${l.tenant_id}</small></td>
-                  <td><code style="background: rgba(255,255,255,0.06); padding: 4px 6px; border-radius: 4px;">${l.license_key}</code></td>
+                  <td>
+                    <code style="background: rgba(255,255,255,0.06); padding: 4px 6px; border-radius: 4px;">${l.license_key}</code>
+                    ${l.status === 'active' ? `
+                      <br>
+                      <button onclick="navigator.clipboard.writeText(\`${l.signed_token}\`); alert('Token copiado!');" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:0.7rem;margin-top:6px;font-weight:bold">
+                        📋 Copiar Token
+                      </button>
+                    ` : ''}
+                  </td>
                   <td><code>${l.hardware_id || '*'}</code></td>
                   <td>${new Date(l.expires_at).toLocaleDateString('pt-BR')}</td>
                   <td>${l.last_online_check ? new Date(l.last_online_check).toLocaleString('pt-BR') : 'Nunca'}</td>
