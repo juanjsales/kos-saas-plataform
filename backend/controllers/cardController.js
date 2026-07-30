@@ -186,3 +186,102 @@ export async function processCardOcr(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export async function confirmCard(req, res) {
+  try {
+    const { id } = req.params;
+    const updatedCard = await prisma.card.update({
+      where: { id },
+      data: { status: 'in_progress' },
+      include: { service: true, contact: true }
+    });
+
+    if (updatedCard.contact?.phone) {
+      triggerCardNotification({
+        tenantId: updatedCard.tenant_id,
+        triggerType: 'status_in_progress',
+        card: updatedCard,
+        service: updatedCard.service,
+        contactPhone: updatedCard.contact.phone
+      }).catch(err => console.error('Error triggering confirmation notification:', err));
+    }
+
+    return res.json(updatedCard);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function analyzeCardAttachment(req, res) {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'Arquivo do documento é obrigatório' });
+    }
+
+    const ocrResult = await processDocumentAttachment(file, null);
+    return res.json({
+      message: 'Análise de documento concluída com sucesso!',
+      extracted_data: ocrResult.extracted_data || {},
+      file_url: ocrResult.file_url || null
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function completeCardWithAttachment(req, res) {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    let ocrData = {};
+    let fileUrl = null;
+
+    if (file) {
+      const card = await prisma.card.findUnique({
+        where: { id },
+        include: { service: true }
+      });
+      const ocrResult = await processDocumentAttachment(file, card?.service || null);
+      ocrData = ocrResult.extracted_data || {};
+      fileUrl = ocrResult.file_url || null;
+    }
+
+    const updatedCard = await prisma.card.update({
+      where: { id },
+      data: {
+        status: 'completed',
+        ...(fileUrl ? { ocr_file_url: fileUrl, ocr_metadata: JSON.stringify(ocrData) } : {})
+      },
+      include: { service: true, contact: true }
+    });
+
+    if (updatedCard.contact?.phone) {
+      triggerCardNotification({
+        tenantId: updatedCard.tenant_id,
+        triggerType: 'status_completed',
+        card: updatedCard,
+        service: updatedCard.service,
+        contactPhone: updatedCard.contact.phone
+      }).catch(err => console.error('Error triggering completion notification:', err));
+    }
+
+    return res.json(updatedCard);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function executeAutomation(req, res) {
+  try {
+    const { id } = req.params;
+    return res.json({
+      message: 'Automação disparada com sucesso para o cartão',
+      card_id: id,
+      status: 'triggered'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}

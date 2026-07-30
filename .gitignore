@@ -23,3 +23,10 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# SQLite & Backup files
+*.db-shm
+*.db-wal
+**/data/backups/
+licensing-server/*.db
+**/baileys_auth_*/

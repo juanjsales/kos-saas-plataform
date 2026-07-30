@@ -64,8 +64,13 @@ function isDuplicateDispatch(cardId, phone, text) {
 /**
  * Triggers notification check and message dispatch for a given card event
  */
-export async function triggerCardNotification(cardId, triggerEvent) {
+export async function triggerCardNotification(cardIdOrOpts, triggerEventParam) {
   try {
+    let cardId = typeof cardIdOrOpts === 'object' ? (cardIdOrOpts.cardId || cardIdOrOpts.card?.id) : cardIdOrOpts;
+    let triggerEvent = typeof cardIdOrOpts === 'object' ? (cardIdOrOpts.triggerType || cardIdOrOpts.triggerEvent) : triggerEventParam;
+
+    if (!cardId) return { success: false, reason: 'Card ID missing' };
+
     // 1. Fetch complete card details with service and contact metadata
     const { data: card, error: cardError } = await supabase
       .from('cards')
@@ -84,8 +89,7 @@ export async function triggerCardNotification(cardId, triggerEvent) {
       .single();
 
     if (cardError || !card) {
-      console.error(`Card notification error: card ${cardId} not found`, cardError);
-      return { success: false, reason: 'Card not found' };
+      return { success: false, reason: 'Card not found or local DB mode active' };
     }
 
     const contactName = card.contacts?.name || 'Cliente';

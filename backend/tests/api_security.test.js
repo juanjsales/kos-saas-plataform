@@ -5,7 +5,7 @@ import servicesRouter from '../routes/services.js';
 import cardsRouter from '../routes/cards.js';
 import { apiRateLimiter, authRateLimiter } from '../middleware/rateLimiter.js';
 import { checkTenantStatus } from '../middleware/authMiddleware.js';
-
+import { prisma } from '../config/db.js';
 import { jest } from '@jest/globals';
 
 // Construct isolated Test Express Server
@@ -26,6 +26,21 @@ app.get('/api/admin/test-rate-limit', authRateLimiter, (req, res) => {
 
 describe('🛡️ Backend Security, Multi-Tenant Isolation & Rate Limiting Suite', () => {
   jest.setTimeout(30000);
+
+  afterAll(async () => {
+    // Automated Cleanup: Purge any test payloads created during test execution
+    try {
+      await prisma.service.deleteMany({
+        where: {
+          OR: [
+            { title: { contains: 'XSS' } },
+            { title: { contains: 'script' } },
+            { title: { contains: 'A'.repeat(100) } }
+          ]
+        }
+      });
+    } catch (e) {}
+  });
 
   test('1. Rate Limiting: Blocks repeated requests with HTTP 429', async () => {
     // Make 5 initial requests (allowed limit for auth rate limiter is 5)

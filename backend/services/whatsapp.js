@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../config/db.js';
 import { pathConfig } from '../config/pathConfig.js';
+import { sendWhatsAppSessionAlert } from './whatsappAlertService.js';
 
 /**
  * Multi-Tenant Session Registry: Maps tenantId -> { sock, status, lastQrData, qrCodeImage, isInitializing, initPromise }
@@ -312,18 +313,36 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 
           if (isLoggedOut) {
             session.status = 'disconnected';
+            session.retryCount = 0;
             console.log(`[WhatsApp Multi-Session] Session marked disconnected for tenant ${activeTenantId}`);
+
+            // Trigger Alert Service for Revoked Session
+            sendWhatsAppSessionAlert({
+              tenantId: activeTenantId,
+              reason: 'SESSION_LOGGED_OUT',
+              statusCode: statusCode || 401,
+              details: 'Sessão do WhatsApp revogada ou desconectada pelo celular do cliente.'
+            }).catch(err => console.error('Error in sendWhatsAppSessionAlert:', err));
+
             if (fs.existsSync(authFolder)) {
               try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
             }
           } else {
             session.status = 'connecting';
+            const currentRetry = (session.retryCount || 0) + 1;
+            session.retryCount = currentRetry;
+
+            // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s
+            const delayMs = isRestartRequired ? 500 : Math.min(2000 * Math.pow(2, currentRetry - 1), 30000);
+            console.log(`🔄 [WhatsApp Multi-Session] Tenant ${activeTenantId} retrying connection in ${delayMs}ms (Attempt #${currentRetry})...`);
+
             setTimeout(() => {
               initWhatsAppEngine(activeTenantId).catch(() => {});
-            }, isRestartRequired ? 500 : 2000);
+            }, delayMs);
           }
         } else if (connection === 'open') {
           session.status = 'connected';
+          session.retryCount = 0;
           session.lastQrData = null;
           session.qrCodeImage = null;
           console.log(`✅ [WhatsApp Multi-Session] Engine connected for Tenant ${activeTenantId} (${sock.user?.name || sock.user?.id})!`);
@@ -471,7 +490,7 @@ export async function initWhatsAppEngine(tenantId = '00000000-0000-0000-0000-000
 /**
  * Sends a text message over WhatsApp socket
  */
-export async function sendWhatsAppMessage(tenantId, phone, messageText) {
+export async function sendWhatsAppMessage(phone, messageText, tenantId) {
   const activeTenantId = await getOrEnsureValidTenant(tenantId);
   const session = await initWhatsAppEngine(activeTenantId);
 
@@ -482,4 +501,53 @@ export async function sendWhatsAppMessage(tenantId, phone, messageText) {
   const jid = formatToJid(phone);
   const result = await session.sock.sendMessage(jid, { text: messageText });
   return result;
+}
+
+/**
+ * Gets the current status of the WhatsApp session for a tenant
+ */
+export function getWhatsAppSessionStatus(tenantId) {
+  const session = tenantSessions.get(tenantId);
+  if (!session) {
+    return {
+      connected: false,
+      status: 'disconnected',
+      qrCode: null
+    };
+  }
+  return {
+    connected: session.status === 'connected',
+    status: session.status,
+    qrCode: session.qrCodeImage || null
+  };
+}
+
+/**
+ * Logs out and clears the WhatsApp engine session for a tenant
+ */
+export async function logoutWhatsAppEngine(tenantId) {
+  const activeTenantId = await getOrEnsureValidTenant(tenantId);
+  const session = tenantSessions.get(activeTenantId);
+
+  if (session) {
+    if (session.sock) {
+      try {
+        await session.sock.logout();
+      } catch (err) {
+        console.error(`Error during sock.logout() for tenant ${activeTenantId}:`, err);
+        try {
+          session.sock.end();
+        } catch (e) {}
+      }
+    }
+    session.sock = null;
+    session.status = 'disconnected';
+    session.qrCodeImage = null;
+    session.lastQrData = null;
+    tenantSessions.delete(activeTenantId);
+  }
+
+  await clearAuthInfoFolder(activeTenantId);
+
+  return { success: true, message: 'WhatsApp session logged out and cleared.' };
 }

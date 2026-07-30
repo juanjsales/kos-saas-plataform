@@ -9,9 +9,12 @@ import notificationsRouter from './routes/notifications.js';
 import messagesRouter from './routes/messages.js';
 import whatsappRouter from './routes/whatsappRoutes.js';
 import authRouter from './routes/authRoutes.js';
+import licenseRouter from './routes/licenseRoutes.js';
 import { pathConfig } from './config/pathConfig.js';
 import { initWhatsAppEngine } from './services/whatsapp.js';
 import { initCardStatusWatcher } from './jobs/cardStatusWatcher.js';
+import { initSqliteBackupJob } from './jobs/backupJob.js';
+import { initLicenseSyncWorker } from './services/licenseSyncService.js';
 
 dotenv.config();
 
@@ -38,6 +41,7 @@ app.use('/api/chats', chatsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/whatsapp', whatsappRouter);
+app.use('/api/license', licenseRouter);
 
 // Healthcheck
 app.get('/health', (req, res) => {
@@ -57,6 +61,12 @@ app.listen(PORT, HOST, async () => {
 
   // Initialize Realtime Card Watcher
   initCardStatusWatcher();
+
+  // Initialize SQLite Daily Backup Job
+  initSqliteBackupJob();
+
+  // Initialize Turso Cloud License Sync Worker
+  initLicenseSyncWorker();
 
   // Initialize WhatsApp Baileys Engine
   if (process.env.ENABLE_WHATSAPP !== 'false') {
